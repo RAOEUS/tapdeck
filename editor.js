@@ -671,19 +671,26 @@ function makeCanvas(canvas, aspect, onResize) {
   return () => ({ W, H, dpr });
 }
 
+// Consistent module header: title + type tag, then a right-aligned controls
+// group (module selects/toggles) always ending in Reset. `controls` is optional
+// HTML for the module's own selects/toggles.
+function edHead(title, tag, controls) {
+  return `<div class="ed-head"><h1>${escapeHtml(title)}</h1><span class="tag">${tag}</span>` +
+    `<div class="ed-controls">${controls || ""}<button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div></div>`;
+}
+
 // ===================== EQ =====================
 function renderEQ(m) {
   m.sel = (m.sel != null && m.sel < m.bands.length) ? m.sel : 0;
   m.mix = m.mix ?? 100;
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Parametric EQ</span><button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
+    ${edHead(m.name, "Parametric EQ", `<button id="eqSolo" class="ed-toggle" title="Solo the selected band — hear exactly the change it makes (the band, phase-cancelled against the dry signal)">Solo band</button>`)}
     <div class="graphwrap"><canvas id="eqCanvas"></canvas></div>
     <div class="toolbar">
       <label>Range <select id="eqRange"><option>12</option><option selected>24</option><option>36</option></select> dB</label>
       <label>Preamp <input type="number" id="eqPreamp" value="${(m.preamp || 0).toFixed(1)}" step="0.5" min="-24" max="24" style="width:62px"> dB</label>
       <label title="Dry/Wet: scales every bell/shelf band's gain toward flat - phase-coherent, no comb filtering">Dry/Wet <input type="number" id="eqMix" value="${m.mix ?? 100}" step="1" min="0" max="100" style="width:58px"> %</label>
       <button class="primary" id="addBand">+ Add band</button>
-      <button id="eqSolo" title="Solo the selected band — hear exactly the change it makes (the band, phase-cancelled against the dry signal)">Solo band</button>
       <button id="eqImport" title="Import an AutoEQ ParametricEQ.txt file">Import AutoEQ</button>
       <input type="file" id="eqFile" accept=".txt,text/plain" style="display:none">
       <span class="hint">drag = freq/gain · alt-drag/wheel = Q · ctrl+alt-drag = dyn range · dbl-click = add · right-click = menu</span>
@@ -1048,7 +1055,7 @@ function renderComp(m) {
     ["mix", knob("mix", "Dry/Wet", m.mix, 0, 100, 1, "%")],
   ];
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Compressor</span>
+    ${edHead(m.name, "Compressor", `
       <label class="detsel">Mode
         <select id="cmode">
           <option value="down" ${m.mode === "down" ? "selected" : ""}>Downward</option>
@@ -1062,9 +1069,7 @@ function renderComp(m) {
           <option value="feedforward" ${m.detector === "feedforward" ? "selected" : ""}>Feed-forward</option>
           <option value="feedback" ${m.detector === "feedback" ? "selected" : ""}>Feed-back</option>
         </select>
-      </label>
-      <button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button>
-    </div>
+      </label>`)}
     <div class="dyn">
       <div class="graphwrap" title="Transfer curve: input level (x) maps to output level (y). The dot rides the curve at the live level; hover anywhere for a readout. Top strip = gain change over time."><canvas id="compCanvas"></canvas></div>
       <div>
@@ -1293,11 +1298,9 @@ function renderLimiter(m) {
   const osOpts = [[1, "Off"], [2, "2×"], [4, "4× (true peak)"]]
     .map(([v, l]) => `<option value="${v}" ${m.os == v ? "selected" : ""}>${l}</option>`).join("");
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Brick-wall limiter</span>
+    ${edHead(m.name, "Brick-wall limiter", `
       <label class="detsel">Style <select id="limStyle">${styleOpts}</select></label>
-      <label class="detsel" title="Oversampled detection catches inter-sample (true) peaks so the reconstructed signal also stays under the ceiling.">Oversampling <select id="limOS">${osOpts}</select></label>
-      <button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button>
-    </div>
+      <label class="detsel" title="Oversampled detection catches inter-sample (true) peaks so the reconstructed signal also stays under the ceiling.">Oversampling <select id="limOS">${osOpts}</select></label>`)}
     <div class="dyn">
       <div class="lim-graph" style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
         <div class="graphwrap"><canvas id="limCanvas"></canvas></div>
@@ -1450,7 +1453,7 @@ function renderUtility(m) {
   m.crossfeed = m.crossfeed ?? 0;
   const tog = (key, label) => `<button class="util-tog ${m[key] ? "on" : ""}" data-key="${key}">${label}</button>`;
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Utility</span><button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
+    ${edHead(m.name, "Utility")}
     <div class="util-top">
       <div class="knobs" style="grid-template-columns:repeat(4,minmax(110px,1fr)); flex:1">
         ${knob("gain", "Gain", m.gain, -24, 24, 0.5, "dB")}
@@ -1553,9 +1556,7 @@ function renderMBComp(m) {
   m.bands.forEach((b) => { if (b.ratioUp == null) b.ratioUp = b.ratio; }); // independent OTT upward ratio
 
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Multiband comp</span>
-      <span style="margin-left:auto">${knobInline("mix", "Dry/Wet", m.mix, 0, 100, 1, "%")}</span>
-      <button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
+    ${edHead(m.name, "Multiband comp", knobInline("mix", "Dry/Wet", m.mix, 0, 100, 1, "%"))}
     <div class="graphwrap"><canvas id="mbCanvas"></canvas></div>
     <div class="mb-notice">
       <span class="mb-notice-ico">✦</span>
@@ -1770,10 +1771,9 @@ function renderSat(m) {
   m.mode = m.mode || "tube"; m.drive = m.drive ?? 6; m.tone = m.tone ?? 0; m.mix = m.mix ?? 100; m.output = m.output ?? 0; m.os = m.os ?? 2;
   const osOpts = [[1, "Off"], [2, "2×"], [4, "4×"]].map(([v, l]) => `<option value="${v}" ${m.os == v ? "selected" : ""}>${l}</option>`).join("");
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Saturation</span>
+    ${edHead(m.name, "Saturation", `
       <label class="detsel">Character <select id="satMode">${SAT_MODES.map((s) => `<option ${s === m.mode ? "selected" : ""}>${s}</option>`).join("")}</select></label>
-      <label class="detsel" title="Run the waveshaper oversampled so its harmonics above Nyquist don't alias back as harshness. Higher = cleaner, more CPU.">Oversampling <select id="satOS">${osOpts}</select></label>
-      <button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
+      <label class="detsel" title="Run the waveshaper oversampled so its harmonics above Nyquist don't alias back as harshness. Higher = cleaner, more CPU.">Oversampling <select id="satOS">${osOpts}</select></label>`)}
     <div class="dyn">
       <div class="graphwrap" title="Waveshaper curve: how the input (x) is reshaped into the output (y) at the current Drive. The diagonal is unity (no change)."><canvas id="satCanvas"></canvas></div>
       <div>
@@ -1810,7 +1810,7 @@ function renderSat(m) {
 function renderTrans(m) {
   m.attack = m.attack ?? 0; m.sustain = m.sustain ?? 0; m.output = m.output ?? 0;
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Transient shaper</span><button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
+    ${edHead(m.name, "Transient shaper")}
     <div class="graphwrap" title="Live waveform: brighter overlay shows how Attack/Sustain reshape each transient's envelope versus the original."><canvas id="transCanvas"></canvas></div>
     <div class="knobs" style="max-width:540px;margin-top:16px">
       ${knob("attack", "Attack", m.attack, -100, 100, 1, "%")}
@@ -1846,7 +1846,7 @@ function renderTrans(m) {
 function renderGate(m) {
   m.threshold = m.threshold ?? -45; m.ratio = m.ratio ?? 4; m.range = m.range ?? 50; m.attack = m.attack ?? 1; m.release = m.release ?? 120; m.hold = m.hold ?? 12;
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Gate / Expander</span><button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
+    ${edHead(m.name, "Gate / Expander")}
     <div class="dyn">
       <div class="graphwrap" title="Top strip: input level vs threshold over time (green = gate open, red = gated). Below: transfer curve with the live operating dot. The GR meter shows reduction."><canvas id="gateCanvas"></canvas></div>
       <div>
@@ -1931,7 +1931,7 @@ function renderGate(m) {
 function renderDenoise(m) {
   m.amount = m.amount ?? 60; m.floor = m.floor ?? 6;
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Noise suppressor</span><button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
+    ${edHead(m.name, "Noise suppressor")}
     <div class="dyn">
       <div class="meterbox"><div><div class="meter" style="height:150px"><div class="fill" id="grFill"></div></div><div class="meter-label">Reduce <span id="grVal">0.0</span></div></div></div>
       <div>
@@ -1961,7 +1961,7 @@ function renderAnalyzer(m) {
   m.sharpen = m.sharpen ?? 0.6; m.view = m.view ?? "spectro"; m.wfTilt = m.wfTilt ?? 0.6; m.wfSpeed = m.wfSpeed ?? 1.5; m.q = m.q ?? 20; m.fft = m.fft ?? 16384;
 
   edEl.innerHTML = `
-    <div class="ed-head"><h1>${m.name}</h1><span class="tag">Spectrogram</span><button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
+    ${edHead(m.name, "Spectrogram")}
     <div class="graphwrap"><canvas id="sgCanvas"></canvas><button id="sgFull" class="sg-icon-btn" title="Fullscreen visualizer">⛶</button><button id="wfReset" class="wf-reset" title="Reset 3D angle">⟳ angle</button></div>
     <div class="toolbar sg-tools">
       <div class="tb-group"><span class="tb-gl">Display</span>

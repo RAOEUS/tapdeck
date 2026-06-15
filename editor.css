@@ -157,10 +157,14 @@ body {
 .ed-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
 .ed-head h1 { font-family: var(--font-display); font-size: 20px; font-weight: 600; margin: 0; letter-spacing: .005em; }
 .ed-head .tag { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; border: 1px solid var(--line); border-radius: 20px; padding: 3px 9px; }
-.ed-head .detsel { margin-left: auto; color: var(--muted); font-size: 12px; }
-.ed-reset { margin-left: auto; background: var(--panel2); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; font: inherit; font-size: 12px; cursor: pointer; }
+/* every module header ends with a right-aligned controls group (selects/toggles + Reset) */
+.ed-controls { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ed-head .detsel { color: var(--muted); font-size: 12px; }
+.ed-reset { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; font: inherit; font-size: 12px; cursor: pointer; }
 .ed-reset:hover { border-color: var(--accent); color: var(--text); }
-.ed-head .detsel + .ed-reset { margin-left: 10px; } /* comp: detection select already pushed right */
+.ed-toggle { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.ed-toggle:hover { border-color: var(--accent); color: var(--text); }
+.ed-toggle.on { border-color: var(--accent); color: var(--accent); background: #14202e; }
 .empty { color: var(--muted); margin-top: 60px; text-align: center; }
 .onboard { display: flex; justify-content: center; padding-top: 52px; }
 .onboard-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 30px; max-width: 480px; box-shadow: var(--nm-out-sm); }
