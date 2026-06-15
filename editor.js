@@ -873,7 +873,7 @@ function renderEQ(m) {
       <label title="Dry/Wet: scales every bell/shelf band's gain toward flat - phase-coherent, no comb filtering">Dry/Wet <input type="number" id="eqMix" value="${m.mix ?? 100}" step="1" min="0" max="100" style="width:58px"> %</label>
       <button class="primary" id="addBand">+ Add band</button>
       <button id="eqHeadphone" title="Search AutoEq for your headphones and apply their correction curve">🎧 Headphone EQ</button>
-      <button id="eqImport" title="Import an AutoEQ ParametricEQ.txt file">Import AutoEQ</button>
+      <button id="eqImport" title="Import a ParametricEQ .txt file from disk (AutoEq export format). Use 🎧 Headphone EQ to fetch one automatically.">Import .txt</button>
       <input type="file" id="eqFile" accept=".txt,text/plain" style="display:none">
       <span class="hint">drag = freq/gain · alt-drag/wheel = Q · ctrl+alt-drag = dyn range · dbl-click = add · right-click = menu</span>
     </div>
