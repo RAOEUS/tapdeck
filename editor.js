@@ -883,8 +883,10 @@ function renderEQ(m) {
       b.q = clamp(qStartVal * Math.exp(-(py - qStartY) / (H * 0.5)), 0.1, 18);
     } else {
       b.freq = clamp(xToF(px, W), 20, 20000);
+      // pass filters have no gain axis: vertical drag adjusts Q *relative* to the grab
+      // point (same as alt-drag) instead of an absolute map, which jumped on any click.
       if (DSP.GAIN_TYPES.has(b.type)) b.gain = clamp(yToG(py, H), -EQ_GMAX, EQ_GMAX);
-      else b.q = clamp(0.3 + (py / H) * 8, 0.1, 18);
+      else b.q = clamp(qStartVal * Math.exp(-(py - qStartY) / (H * 0.5)), 0.1, 18);
     }
     pushParam(m);
     // update just the dragged row's fields in place (rebuilding the table here
