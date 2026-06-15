@@ -1,0 +1,24 @@
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Node (only if tooling is ever added)
+node_modules/
+npm-debug.log*
+
+# Packaged extension artifacts
+*.zip
+*.crx
+*.pem
+web-ext-artifacts/

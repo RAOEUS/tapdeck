@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>Tapdeck - Rack &amp; Visualizer</title>
+    <link rel="stylesheet" href="editor.css" />
+  </head>
+  <body>
+    <div id="app">
+      <aside id="rack">
+        <div id="brand"><img src="icons/active-48.png" alt="" /><span>Tapdeck</span></div>
+        <div id="rackHeader">
+          <h2>Rack</h2>
+          <div id="addBtns">
+            <button data-add="eq">+ EQ</button>
+            <button data-add="comp">+ Comp</button>
+            <button data-add="mbcomp">+ MBand</button>
+            <button data-add="gate">+ Gate</button>
+            <button data-add="denoise">+ Denoise</button>
+            <button data-add="trans">+ Trans</button>
+            <button data-add="sat">+ Sat</button>
+            <button data-add="limiter">+ Limit</button>
+            <button data-add="utility">+ Util</button>
+            <button data-add="analyzer">+ Scope</button>
+          </div>
+        </div>
+        <div id="presetBar">
+          <select id="presetSelect"></select>
+          <button id="presetApply" title="Apply preset to this tab">Apply</button>
+          <button id="presetSave" title="Save this tab's rack as a preset">Save</button>
+          <button id="presetDelete" title="Delete selected user preset">✕</button>
+        </div>
+        <ul id="moduleList"></ul>
+        <div id="engineStatus"><span class="dot"></span><span id="engineText">Engine idle</span></div>
+      </aside>
+
+      <main id="editor">
+        <div id="topbar">
+          <span class="tb-label">Tabs</span>
+          <div id="tabSwitcher"></div>
+          <button id="masterBypass" class="tb-btn" title="Bypass all DSP for this tab (clean A/B of processed vs original)">Bypass tab</button>
+          <button id="setDefault" class="tb-btn" title="Use this rack as the default for new tabs">Set as default</button>
+        </div>
+        <div id="moduleEditor"><p class="empty">Add or select a module.</p></div>
+      </main>
+    </div>
+    <script src="dsp-math.js"></script>
+    <script src="editor.js"></script>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5a6472"/>
+      <stop offset="1" stop-color="#3f4754"/>
+    </linearGradient>
+  </defs>
+  <rect x="6" y="6" width="116" height="116" rx="30" fill="url(#bg)"/>
+  <!-- cassette body -->
+  <rect x="24" y="38" width="80" height="54" rx="11" fill="none" stroke="#ffffff" stroke-width="6.5"/>
+  <!-- reels -->
+  <circle cx="49" cy="65" r="12" fill="#ffffff"/>
+  <circle cx="49" cy="65" r="4.3" fill="#333a45"/>
+  <circle cx="79" cy="65" r="12" fill="#ffffff"/>
+  <circle cx="79" cy="65" r="4.3" fill="#333a45"/>
+  <!-- tape spanning the reels -->
+  <rect x="49" y="63" width="30" height="4.2" rx="2.1" fill="#ffffff"/>
+  <!-- little level ticks along the bottom = the 'deck' / signal -->
+  <g fill="#ffffff">
+    <rect x="40" y="83" width="4" height="4" rx="1.4"/>
+    <rect x="50" y="83" width="4" height="4" rx="1.4"/>
+    <rect x="60" y="83" width="4" height="4" rx="1.4"/>
+    <rect x="70" y="83" width="4" height="4" rx="1.4"/>
+    <rect x="80" y="83" width="4" height="4" rx="1.4"/>
+  </g>
+</svg>

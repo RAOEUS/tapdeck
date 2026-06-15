@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      @font-face { font-family: "Inter"; font-weight: 400; font-display: swap; src: url("fonts/inter-400.woff2") format("woff2"); }
+      @font-face { font-family: "Inter"; font-weight: 600; font-display: swap; src: url("fonts/inter-600.woff2") format("woff2"); }
+      @font-face { font-family: "Inter"; font-weight: 700; font-display: swap; src: url("fonts/inter-700.woff2") format("woff2"); }
+      @font-face { font-family: "Space Grotesk"; font-weight: 700; font-display: swap; src: url("fonts/spacegrotesk-700.woff2") format("woff2"); }
+      :root {
+        --bg: #14171d; --panel: #181c23; --panel2: #1f242c; --line: #2a313b;
+        --text: #e6e8ec; --muted: #8b929e; --accent: #36a3ff; --danger: #e5564b;
+      }
+      * { box-sizing: border-box; }
+      body { width: 264px; margin: 0; padding: 14px; font: 13px "Inter", system-ui, sans-serif; background: var(--bg); color: var(--text); -webkit-font-smoothing: antialiased; }
+      header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+      header img { width: 34px; height: 34px; border-radius: 9px; }
+      h1 { font-family: "Space Grotesk", "Inter", sans-serif; font-size: 16px; margin: 0; font-weight: 700; letter-spacing: .2px; }
+      .sub { margin: 1px 0 0; color: var(--muted); font-size: 11px; }
+      button { width: 100%; padding: 9px; border: 0; border-radius: 8px; font: inherit; font-weight: 600; cursor: pointer;
+        background: var(--panel2); color: var(--text); }
+      button:hover { filter: brightness(1.1); }
+      .primary { background: var(--accent); color: #06121d; }
+      .primary.danger { background: var(--danger); color: #fff; }
+      .ghost { background: var(--panel); color: var(--text); margin-top: 8px; }
+      #controls { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 10px; }
+      .row { display: flex; align-items: center; gap: 8px; min-height: 26px; }
+      .row + .row { margin-top: 6px; }
+      .row > span:first-child { color: var(--muted); font-size: 12px; width: 56px; }
+      .tog { width: auto; padding: 4px 12px; border-radius: 6px; font-size: 12px; }
+      .tog.on { background: var(--danger); color: #fff; }
+      input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); } /* min-width:0 so it shrinks instead of pushing the value out of bounds */
+      .val { font-variant-numeric: tabular-nums; color: var(--text); font-size: 12px; min-width: 42px; text-align: right; flex: none; }
+      #sessions { margin-top: 10px; }
+      .shead { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .6px; margin: 4px 2px; }
+      .srow { display: flex; align-items: center; gap: 7px; padding: 5px 7px; border-radius: 7px; background: var(--panel); margin-bottom: 4px; }
+      .srow .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 6px var(--accent); flex: none; }
+      .srow .t { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+      .srow .x { width: auto; padding: 2px 7px; background: transparent; color: var(--muted); font-size: 12px; }
+      .srow .x:hover { color: var(--danger); }
+      #status { margin-top: 9px; font-size: 11px; color: var(--muted); text-align: center; min-height: 14px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <img src="icons/active-48.png" alt="Tapdeck" />
+      <div><h1>Tapdeck</h1><p class="sub">Real-time DSP for this tab</p></div>
+    </header>
+    <button id="toggle" class="primary">Start on this tab</button>
+    <div id="controls" hidden>
+      <div class="row"><span>Bypass</span><button id="bypass" class="tog">Active</button>
+        <span class="val" id="bypassHint" style="flex:1;text-align:right;color:var(--muted)">DSP on</span></div>
+      <div class="row"><span>Output</span><input id="gain" type="range" min="-24" max="6" step="0.5" value="0" />
+        <span class="val" id="gainv">0 dB</span></div>
+    </div>
+    <div id="sessions"></div>
+    <button id="open" class="ghost">Open Rack &amp; Visualizer</button>
+    <div id="status"></div>
+    <script src="popup.js"></script>
+  </body>
+</html>
