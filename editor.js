@@ -2092,7 +2092,7 @@ function renderDereverb(m) {
       drvAnAid[m.id] = an.aid;
       if (an.n >= 20) {
         const setK = (key, val) => { const inp = document.getElementById("k_" + key); if (inp) { inp.value = val; inp.dispatchEvent(new Event("input")); } };
-        setK("tail", an.tail); setK("amount", an.amount);
+        setK("tail", an.tail); setK("amount", an.amount); if (an.residual != null) setK("residual", an.residual);
         toast(`Analyzed room · Tail ${an.tail} ms · Amount ${an.amount}%`);
       } else {
         toast("Couldn't read the reverb — play audio with pauses, then Analyze again");

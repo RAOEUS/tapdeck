@@ -21,7 +21,8 @@ test("auto-analysis posts a Tail/Amount suggestion in range", () => {
   const a = analyze(0.25, 0.4);
   assert.ok(a && a.n >= 20, "should collect decay slopes");
   assert.ok(a.tail >= 60 && a.tail <= 1500, `tail in range, got ${a.tail}`);
-  assert.ok(a.amount >= 35 && a.amount <= 85, `amount in range, got ${a.amount}`);
+  assert.ok(a.amount >= 30 && a.amount <= 60, `amount in range, got ${a.amount}`);
+  assert.ok(a.residual >= 10 && a.residual <= 20, `residual in range, got ${a.residual}`);
 });
 
 test("auto-analysis suggests a longer Tail for a slower decay", () => {
