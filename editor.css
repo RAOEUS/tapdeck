@@ -47,18 +47,60 @@ body {
 #brand span { font-family: var(--font-display); font-size: 18px; font-weight: 700; letter-spacing: .2px; color: var(--text); }
 #rackHeader { padding: 10px 14px 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
 #rackHeader h2 { font-size: 12px; margin: 0; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
-#addBtns { display: flex; gap: 4px; flex-wrap: wrap; }
-#addBtns button {
+#addWrap { position: relative; }
+#addBtn {
   background: var(--panel2); color: var(--text); border: 1px solid var(--line);
-  border-radius: 6px; font-size: 11px; padding: 4px 8px; cursor: pointer; transition: .12s;
+  border-radius: 7px; font: inherit; font-size: 12px; font-weight: 600; padding: 6px 12px; cursor: pointer; transition: .12s;
 }
-#addBtns button:hover { border-color: var(--accent); color: #fff; }
+#addBtn::after { content: " ▾"; color: var(--muted); }
+#addBtn:hover { border-color: var(--accent); color: #fff; }
+#addBtn.on { border-color: var(--accent); color: #fff; }
+#addMenu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 40; width: 232px; max-height: 60vh; overflow-y: auto;
+  background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 6px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.45);
+}
+#addMenu .addgroup { font-size: 10px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); padding: 8px 8px 4px; }
+#addMenu .addgroup:first-child { padding-top: 4px; }
+#addMenu button {
+  display: flex; flex-direction: column; gap: 1px; width: 100%; text-align: left;
+  background: none; border: 0; border-radius: 7px; padding: 7px 9px; cursor: pointer; color: var(--text);
+}
+#addMenu button b { font-size: 13px; font-weight: 600; }
+#addMenu button span { font-size: 11px; color: var(--muted); }
+#addMenu button:hover { background: #14202e; }
+#addMenu button:hover b { color: var(--accent); }
 
-#presetBar { display: flex; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--line); align-items: center; }
-#presetBar select { flex: 1; min-width: 0; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; font: inherit; font-size: 12px; }
-#presetBar button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; font: inherit; font-size: 12px; cursor: pointer; flex: none; }
-#presetBar button:hover { border-color: var(--accent); }
-#presetBar #presetDelete:hover { border-color: var(--danger); color: var(--danger); }
+#presetBar { display: flex; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); align-items: center; }
+#presetBar button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 7px; padding: 6px 10px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+#presetBar #presetBrowse { flex: 1; }
+#presetBar button:hover { border-color: var(--accent); color: #fff; }
+
+/* ---- modal (preset browser) ---- */
+.modal-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(8,10,14,.6); backdrop-filter: blur(2px); display: flex; align-items: center; justify-content: center; padding: 24px; }
+.modal { width: min(820px, 100%); max-height: 86vh; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 24px 70px rgba(0,0,0,.55); }
+.modal-head { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.modal-head h2 { font-family: var(--font-display); font-size: 17px; font-weight: 600; margin: 0; }
+.modal-x { background: none; border: 0; color: var(--muted); font-size: 16px; cursor: pointer; border-radius: 6px; padding: 2px 7px; }
+.modal-x:hover { color: var(--text); background: rgba(255,255,255,.06); }
+.modal-body { padding: 14px 20px 6px; overflow-y: auto; }
+.modal-foot { display: flex; align-items: center; gap: 14px; padding: 13px 20px; border-top: 1px solid var(--line); }
+.modal-foot .primary { background: var(--accent); color: #06121d; border: 0; border-radius: 8px; padding: 8px 14px; font: inherit; font-weight: 600; cursor: pointer; }
+.modal-foot .primary:hover { filter: brightness(1.08); }
+.modal-hint { font-size: 11px; color: var(--muted); }
+
+.preset-cat { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 16px 2px 8px; }
+.preset-cat:first-child { margin-top: 4px; }
+.preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: 10px; }
+.preset-card { position: relative; display: flex; flex-direction: column; gap: 5px; text-align: left; background: linear-gradient(var(--panel2), #191e26); border: 1px solid #232a34; border-radius: 10px; padding: 12px 13px; cursor: pointer; font: inherit; color: var(--text); transition: border-color .12s, transform .06s; }
+.preset-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+.pc-name { font-weight: 600; font-size: 13px; }
+.pc-desc { font-size: 11px; color: var(--muted); line-height: 1.45; min-height: 30px; }
+.pc-chain { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.pc-tag { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; background: #11151b; border: 1px solid var(--line); padding: 2px 6px; border-radius: 20px; }
+.pc-del { position: absolute; top: 8px; right: 9px; color: var(--muted); font-size: 12px; line-height: 1; padding: 2px 4px; border-radius: 5px; }
+.pc-del:hover { color: var(--danger); background: rgba(229,86,75,.12); }
+.preset-none { color: var(--muted); font-size: 12px; padding: 2px 2px 8px; }
 
 #moduleList { list-style: none; margin: 0; padding: 8px; flex: 1; overflow-y: auto; }
 .module-item {
@@ -120,9 +162,18 @@ body {
 .ed-reset:hover { border-color: var(--accent); color: var(--text); }
 .ed-head .detsel + .ed-reset { margin-left: 10px; } /* comp: detection select already pushed right */
 .empty { color: var(--muted); margin-top: 60px; text-align: center; }
+.onboard { display: flex; justify-content: center; padding-top: 52px; }
+.onboard-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 30px; max-width: 480px; box-shadow: var(--nm-out-sm); }
+.onboard-card h2 { font-family: var(--font-display); margin: 0 0 14px; font-size: 18px; font-weight: 600; }
+.onboard-card ol { margin: 0; padding-left: 20px; line-height: 2; color: var(--muted); }
+.onboard-card p { margin: 0; color: var(--muted); line-height: 1.7; }
+.onboard-card b { color: var(--text); font-weight: 600; }
 
 .graphwrap { position: relative; width: 100%; background: #0a0c10; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 8px 30px rgba(0,0,0,.25); }
 canvas { display: block; width: 100%; }
+/* the Compressor/Gate graphs are square/tall; cap them so they never dwarf the
+   viewport (makeCanvas honours this max-height and draws to whatever H results). */
+#compCanvas, #gateCanvas { max-height: 440px; }
 
 .toolbar { display: flex; align-items: center; gap: 18px; margin: 14px 0; flex-wrap: wrap; }
 .toolbar label { color: var(--muted); font-size: 12px; }
@@ -188,6 +239,20 @@ table.bands tr { cursor: pointer; }
 .xfeed-svg path { transition: opacity .12s; }
 .xfeed-text { font-size: 12px; color: var(--muted); line-height: 1.55; }
 .xfeed-text b { color: var(--text); }
+
+/* compressor feed-forward / feed-back detector schematic */
+.det-flow { display: flex; gap: 16px; align-items: center; margin-top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; box-shadow: var(--nm-out-sm); }
+.det-svg { width: 270px; height: 100px; flex: none; color: var(--accent2); }
+.det-svg text { fill: var(--muted); font-size: 10px; font-weight: 600; text-anchor: middle; }
+.det-svg .boxtxt { fill: var(--text); font-size: 9px; }
+.det-svg .sigwire { stroke: #3a4452; stroke-width: 2; }
+.det-svg .node { fill: #6b7280; }
+.det-svg .box { fill: #11151b; stroke: #3a4452; stroke-width: 1.5; }
+.det-svg .ctrl { stroke: var(--accent2); stroke-width: 1.5; fill: none; }
+.det-svg .tap { stroke: #2a323d; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; transition: stroke .15s, opacity .15s; opacity: .5; }
+.det-svg .tap.active { stroke: var(--accent); stroke-width: 2; stroke-dasharray: none; opacity: 1; }
+.det-text { font-size: 12px; color: var(--muted); line-height: 1.55; }
+.det-text b { color: var(--text); }
 .knob { background: linear-gradient(var(--panel), #13171e); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; }
 .knob label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px; }
 .knob .val { float: right; color: var(--text); font-variant-numeric: tabular-nums; text-transform: none; letter-spacing: 0; min-width: 52px; display: inline-block; text-align: right; }
@@ -344,3 +409,32 @@ button.primary { background: var(--accent); color: #06121d; }
 .sg-icon-btn:hover { border-color: var(--accent); }
 .graphwrap:fullscreen { width: 100vw; height: 100vh; border-radius: 0; box-shadow: none; }
 .graphwrap:fullscreen canvas { height: 100vh; }
+
+/* ---- short-viewport fit: progressively compact tall editors (Compressor, Gate,
+   and any module using the .dyn graph+controls layout) so they don't overflow ---- */
+@media (max-height: 860px) {
+  #editor { padding: 16px 22px; }
+  #topbar { margin-bottom: 12px; }
+  .ed-head { margin-bottom: 10px; }
+  .ed-head h1 { font-size: 18px; }
+  .dyn { gap: 16px; }
+  .dyn .meter { height: 128px !important; } /* override per-module inline heights */
+  .knobs { gap: 10px; }
+  .knob { padding: 8px 11px; }
+  .knob label { margin-bottom: 5px; }
+  #compCanvas, #gateCanvas { max-height: 320px; }
+}
+@media (max-height: 720px) {
+  .dyn .knobs { grid-template-columns: repeat(3, 1fr); } /* 3-up = fewer rows */
+  .dyn .meter { height: 100px !important; }
+  .knob { padding: 6px 9px; }
+  .knob label { margin-bottom: 3px; font-size: 10px; }
+  .knob .val { min-width: 40px; }
+  #topbar { padding: 7px 12px; margin-bottom: 10px; }
+  #compCanvas, #gateCanvas { max-height: 230px; }
+}
+@media (max-height: 600px) {
+  #editor { padding: 12px 16px; }
+  .dyn .meter { height: 78px !important; }
+  #compCanvas, #gateCanvas { max-height: 165px; }
+}

@@ -11,24 +11,29 @@
         <div id="brand"><img src="icons/active-48.png" alt="" /><span>Tapdeck</span></div>
         <div id="rackHeader">
           <h2>Rack</h2>
-          <div id="addBtns">
-            <button data-add="eq">+ EQ</button>
-            <button data-add="comp">+ Comp</button>
-            <button data-add="mbcomp">+ MBand</button>
-            <button data-add="gate">+ Gate</button>
-            <button data-add="denoise">+ Denoise</button>
-            <button data-add="trans">+ Trans</button>
-            <button data-add="sat">+ Sat</button>
-            <button data-add="limiter">+ Limit</button>
-            <button data-add="utility">+ Util</button>
-            <button data-add="analyzer">+ Scope</button>
+          <div id="addWrap">
+            <button id="addBtn" aria-haspopup="true" aria-expanded="false">+ Add module</button>
+            <div id="addMenu" hidden>
+              <div class="addgroup">Tone</div>
+              <button data-add="eq"><b>EQ</b><span>shape the frequency balance</span></button>
+              <button data-add="sat"><b>Saturator</b><span>add harmonics &amp; warmth</span></button>
+              <button data-add="trans"><b>Transient</b><span>shape punch &amp; sustain</span></button>
+              <div class="addgroup">Dynamics</div>
+              <button data-add="comp"><b>Compressor</b><span>even out the level</span></button>
+              <button data-add="mbcomp"><b>Multiband</b><span>compress per frequency band</span></button>
+              <button data-add="gate"><b>Gate</b><span>cut noise &amp; bleed below a threshold</span></button>
+              <button data-add="limiter"><b>Limiter</b><span>brick-wall the peaks / ceiling</span></button>
+              <div class="addgroup">Stereo &amp; cleanup</div>
+              <button data-add="utility"><b>Utility</b><span>gain, pan, width, mono, crossfeed</span></button>
+              <button data-add="denoise"><b>Denoise</b><span>reduce steady hiss &amp; hum</span></button>
+              <div class="addgroup">Analysis</div>
+              <button data-add="analyzer"><b>Scope</b><span>multi-resolution spectrogram</span></button>
+            </div>
           </div>
         </div>
         <div id="presetBar">
-          <select id="presetSelect"></select>
-          <button id="presetApply" title="Apply preset to this tab">Apply</button>
+          <button id="presetBrowse" title="Browse and apply rack presets">⊞ Browse presets</button>
           <button id="presetSave" title="Save this tab's rack as a preset">Save</button>
-          <button id="presetDelete" title="Delete selected user preset">✕</button>
         </div>
         <ul id="moduleList"></ul>
         <div id="engineStatus"><span class="dot"></span><span id="engineText">Engine idle</span></div>

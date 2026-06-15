@@ -169,43 +169,58 @@ function cloneRack(src) {
 }
 
 // ---------- presets ----------
+// module spec builders (every field a worklet reads, so presets are self-contained)
 const eb = (type, freq, gain, q) => ({ type, freq, gain, q, enabled: true });
 const mbBand = (threshold, ratio, attack, release, makeup) => ({ threshold, ratio, attack, release, knee: 6, makeup, bypass: false, detector: "feedforward", mode: "down", range: 24 });
 const ottBand = (threshold, ratio, attack, release, makeup) => ({ threshold, ratio, attack, release, knee: 6, makeup, bypass: false, detector: "feedforward", mode: "ott", range: 30 });
-// static EQ band (with optional dynamics): dynMode 'down'|'up'|'below'
+// static EQ band (with optional dynamics): dynMode 'down'|'up'|'below'|'ott'
 const eqd = (type, freq, q, gain, dynMode, dynThr, dynRange, dynAtk, dynRel) => ({ enabled: true, type, freq, q, gain, dynMode, dynThr, dynRange, dynAtk, dynRel });
+const EQm = (bands, o) => ({ type: "eq", name: "EQ", preamp: 0, mix: 100, bands, ...o });
+const Cm = (o) => ({ type: "comp", name: "Compressor", threshold: -20, ratio: 3, ratioUp: 3, attack: 10, release: 120, knee: 6, makeup: 0, detector: "feedforward", mode: "down", range: 24, mix: 100, ...o });
+const MBm = (name, xovers, bands, o) => ({ type: "mbcomp", name, selBand: 0, xovers, bands, mix: 100, ...o });
+const Lm = (o) => ({ type: "limiter", name: "Limiter", inputGain: 0, ceiling: -1, attack: 0, release: 60, hold: 5, lookahead: 5, link: 100, os: 2, style: "transparent", unity: false, dc: false, ...o });
+const Sm = (o) => ({ type: "sat", name: "Saturator", drive: 6, mode: "tube", tone: 0, mix: 100, output: 0, os: 2, ...o });
+const Gm = (o) => ({ type: "gate", name: "Gate", threshold: -45, ratio: 4, range: 50, attack: 1, release: 120, hold: 12, ...o });
+const Dm = (o) => ({ type: "denoise", name: "Denoise", amount: 60, floor: 6, ...o });
+const Tm = (o) => ({ type: "trans", name: "Transient", attack: 0, sustain: 0, output: 0, ...o });
+const Um = (o) => ({ type: "utility", name: "Utility", gain: 0, pan: 0, width: 1, mono: false, invL: false, invR: false, swap: false, crossfeed: 0, ...o });
+const Am = () => ({ type: "analyzer", name: "Analyzer" });
+
+const PRESET_CATS = ["Listening", "Voice & Podcast", "Calls & Streaming", "Mastering", "Creative / FX"];
 const BUILTIN_PRESETS = {
-  "Flat": [
-    { type: "eq", name: "EQ", bands: [eb("peaking", 100, 0, 1), eb("peaking", 1000, 0, 1), eb("peaking", 8000, 0, 1)] },
-    { type: "analyzer", name: "Analyzer" },
-  ],
-  "Bass Boost": [
-    { type: "eq", name: "EQ", bands: [eb("lowshelf", 90, 6, 0.7), eb("peaking", 300, -1.5, 1), eb("highshelf", 10000, 2, 0.7)] },
-  ],
-  "Vocal Clarity": [
-    { type: "eq", name: "EQ", bands: [eb("highpass", 90, 0, 0.7), eb("peaking", 350, -3, 1.2), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)] },
-    { type: "comp", name: "Compressor", threshold: -20, ratio: 3, attack: 8, release: 120, knee: 6, makeup: 2, detector: "feedforward" },
-  ],
-  "Loudness Smile": [
-    { type: "eq", name: "EQ", bands: [eb("lowshelf", 80, 5, 0.7), eb("peaking", 1000, -2, 0.8), eb("highshelf", 8000, 4, 0.7)] },
-  ],
-  "Master Bus": [
-    { type: "eq", name: "EQ", bands: [eb("highpass", 28, 0, 0.7), eb("peaking", 200, -1, 1), eb("highshelf", 12000, 1.5, 0.7)] },
-    { type: "comp", name: "Glue Comp", threshold: -18, ratio: 2, attack: 30, release: 150, knee: 6, makeup: 2, detector: "feedback" },
-    { type: "limiter", name: "Limiter", inputGain: 1, ceiling: -0.8, release: 80, lookahead: 5 },
-    { type: "analyzer", name: "Analyzer" },
-  ],
-  "Mastering (MB)": [
-    { type: "eq", name: "EQ", bands: [eb("highpass", 30, 0, 0.7), eb("highshelf", 12000, 1.5, 0.7)] },
-    { type: "mbcomp", name: "Multiband", selBand: 0, xovers: [200, 3000], bands: [mbBand(-22, 2, 30, 200, 2), mbBand(-22, 2, 20, 160, 1.5), mbBand(-22, 2, 12, 120, 1.5)] },
-    { type: "limiter", name: "Limiter", inputGain: 1, ceiling: -0.8, release: 80, lookahead: 5 },
-    { type: "analyzer", name: "Analyzer" },
-  ],
-  "Stereo Shaper": [
-    { type: "utility", name: "Utility", gain: 0, pan: 0, width: 1.3, mono: false, invL: false, invR: false, swap: false },
-    { type: "eq", name: "EQ", bands: [eb("lowshelf", 100, 1, 0.7)] },
-    { type: "analyzer", name: "Analyzer" },
-  ],
+  // ---- Listening ----
+  "Flat (reference)": { cat: "Listening", desc: "Unprocessed — a clean reference with the analyzer.", modules: [EQm([eb("peaking", 100, 0, 1), eb("peaking", 1000, 0, 1), eb("peaking", 8000, 0, 1)]), Am()] },
+  "Bass Boost": { cat: "Listening", desc: "Deeper low end with a touch of air on top.", modules: [EQm([eb("lowshelf", 90, 6, 0.7), eb("peaking", 300, -1.5, 1), eb("highshelf", 10000, 2, 0.7)])] },
+  "Loudness Smile": { cat: "Listening", desc: "Smiley curve — fuller lows and brighter highs.", modules: [EQm([eb("lowshelf", 80, 5, 0.7), eb("peaking", 1000, -2, 0.8), eb("highshelf", 8000, 4, 0.7)])] },
+  "Vocal Clarity": { cat: "Listening", desc: "Lifts speech and vocals out of a busy mix.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 350, -3, 1.2), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -20, ratio: 3, attack: 8, makeup: 2 })] },
+  "Warm & Smooth": { cat: "Listening", desc: "Tube warmth that softens digital harshness.", modules: [Sm({ drive: 5, mode: "tube", tone: -15, mix: 60 }), EQm([eb("lowshelf", 120, 1.5, 0.7), eb("highshelf", 9000, -2, 0.7)])] },
+  "Air & Clarity": { cat: "Listening", desc: "Cuts mud, adds presence and high-end sparkle.", modules: [EQm([eb("peaking", 300, -2, 1), eb("peaking", 4000, 2, 1.2), eb("highshelf", 11000, 3, 0.7)])] },
+  "Night Mode": { cat: "Listening", desc: "Evens out loud and quiet so nothing startles late at night.", modules: [Cm({ threshold: -32, ratio: 4, attack: 15, release: 200, makeup: 6, detector: "feedback" }), EQm([eb("lowshelf", 90, -2, 0.7), eb("highshelf", 9000, -1.5, 0.7)]), Lm({ ceiling: -1 })] },
+
+  // ---- Voice & Podcast ----
+  "Podcast Voice": { cat: "Voice & Podcast", desc: "Full chain: denoise, gate, EQ, compression and a safety limiter.", modules: [Dm({ amount: 50, floor: 8 }), Gm({ threshold: -42, ratio: 6, range: 40, release: 150, hold: 20 }), EQm([eb("highpass", 80, 0, 0.7), eb("peaking", 250, -3, 1), eb("peaking", 3500, 3, 1.2), eb("highshelf", 10000, 2, 0.7)]), Cm({ threshold: -22, ratio: 3.5, attack: 6, makeup: 4 }), Lm({ ceiling: -1.5 })] },
+  "Clean Voice": { cat: "Voice & Podcast", desc: "Denoise, shape and level for talking.", modules: [Dm({ amount: 45, floor: 8 }), EQm([eb("highpass", 85, 0, 0.7), eb("peaking", 300, -2.5, 1), eb("peaking", 3000, 3, 1.2)]), Cm({ threshold: -20, ratio: 3, attack: 8, makeup: 3 })] },
+  "De-ess & Polish": { cat: "Voice & Podcast", desc: "A dynamic high band tames sibilance; gentle glue on top.", modules: [EQm([eb("highpass", 80, 0, 0.7), eqd("peaking", 7000, 3, 0, "down", -28, 8, 1, 80), eb("highshelf", 10000, 1.5, 0.7)]), Cm({ threshold: -20, ratio: 3, attack: 6, makeup: 2 })] },
+  "Broadcast": { cat: "Voice & Podcast", desc: "Loud, consistent, radio-style voice.", modules: [Dm({ amount: 35, floor: 10 }), EQm([eb("highpass", 75, 0, 0.7), eb("peaking", 2500, 2.5, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -24, ratio: 4, attack: 5, release: 100, makeup: 5 }), Lm({ ceiling: -1, inputGain: 2, style: "punchy" })] },
+
+  // ---- Calls & Streaming ----
+  "Noise Kill": { cat: "Calls & Streaming", desc: "Aggressive denoise + gate for fans, hum and room tone.", modules: [Dm({ amount: 80, floor: 4 }), Gm({ threshold: -38, ratio: 8, range: 50, release: 120, hold: 15 })] },
+  "Meeting Voice": { cat: "Calls & Streaming", desc: "Clear, intelligible voice for calls.", modules: [Dm({ amount: 55, floor: 8 }), EQm([eb("highpass", 100, 0, 0.7), eb("peaking", 3000, 3, 1.2)]), Cm({ threshold: -22, ratio: 3, attack: 8, release: 110, makeup: 3 })] },
+  "Stream Master": { cat: "Calls & Streaming", desc: "Glue + true-peak limit for streaming loudness targets.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 12000, 1.5, 0.7)]), Cm({ threshold: -18, ratio: 2, attack: 30, release: 150, makeup: 2, detector: "feedback" }), Lm({ ceiling: -1.5, os: 4 })] },
+
+  // ---- Mastering ----
+  "Master Bus": { cat: "Mastering", desc: "Gentle glue compression into a clean limiter.", modules: [EQm([eb("highpass", 28, 0, 0.7), eb("peaking", 200, -1, 1), eb("highshelf", 12000, 1.5, 0.7)]), Cm({ name: "Glue Comp", threshold: -18, ratio: 2, attack: 30, release: 150, makeup: 2, detector: "feedback" }), Lm({ inputGain: 1, ceiling: -0.8, release: 80 }), Am()] },
+  "Mastering (MB)": { cat: "Mastering", desc: "Multiband control into a true-peak limiter.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 12000, 1.5, 0.7)]), MBm("Multiband", [200, 3000], [mbBand(-22, 2, 30, 200, 2), mbBand(-22, 2, 20, 160, 1.5), mbBand(-22, 2, 12, 120, 1.5)]), Lm({ inputGain: 1, ceiling: -0.8, release: 80, os: 4 }), Am()] },
+  "Loud Master": { cat: "Mastering", desc: "Pushed loudness with punch — for energetic music.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("lowshelf", 90, 1.5, 0.7), eb("highshelf", 11000, 2, 0.7)]), MBm("Multiband", [150, 2500], [mbBand(-24, 3, 20, 150, 3), mbBand(-22, 3, 15, 120, 2), mbBand(-20, 3, 8, 90, 2)]), Lm({ inputGain: 3, ceiling: -0.8, style: "punchy", os: 4 })] },
+  "Transparent Master": { cat: "Mastering", desc: "Minimal — just a clean true-peak ceiling.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 13000, 1, 0.7)]), Lm({ inputGain: 1, ceiling: -1, style: "transparent", os: 4 })] },
+
+  // ---- Creative / FX ----
+  "OTT": { cat: "Creative / FX", desc: "Aggressive up+down multiband — that modern, in-your-face sound.", modules: [MBm("OTT", [120, 2000], [ottBand(-30, 3, 15, 120, 3), ottBand(-30, 3, 10, 100, 3), ottBand(-30, 3, 6, 80, 3)]), EQm([eb("lowshelf", 90, 1, 0.7), eb("highshelf", 10000, 2, 0.7)])] },
+  "Lo-Fi": { cat: "Creative / FX", desc: "Band-limited and gritty — vintage/lo-fi character.", modules: [EQm([eb("highpass", 200, 0, 0.7), eb("peaking", 1000, 2, 1), eb("lowpass", 6000, 0, 0.7)]), Sm({ drive: 10, mode: "crunch", tone: -20, mix: 80, os: 4 })] },
+  "Telephone": { cat: "Creative / FX", desc: "Narrowband 'phone call' effect.", modules: [EQm([eb("highpass", 300, 0, 0.9), eb("peaking", 1500, 4, 1.5), eb("lowpass", 3400, 0, 0.9)])] },
+  "Saturated Drive": { cat: "Creative / FX", desc: "Heavy harmonic drive with output trim.", modules: [Sm({ drive: 14, mode: "tape", output: -3, os: 4 }), EQm([eb("lowshelf", 100, 1, 0.7), eb("highshelf", 10000, -1, 0.7)])] },
+  "Wide & Big": { cat: "Creative / FX", desc: "Wider stereo image with a fuller tone.", modules: [Um({ width: 1.4 }), EQm([eb("lowshelf", 100, 1.5, 0.7), eb("highshelf", 10000, 2, 0.7)]), Cm({ threshold: -20, ratio: 2, attack: 20, release: 150, makeup: 1 })] },
+  "Mono Check": { cat: "Creative / FX", desc: "Sum to mono to check mono compatibility and phase.", modules: [Um({ mono: true })] },
 };
 
 // transient non-blocking confirmation pill (bottom-center, fades after ~1.4s)
@@ -234,9 +249,14 @@ function doUndo() {
   toast("Undid last change");
 }
 
+// modules array for a preset name, from either source
+function presetModules(name) {
+  const b = BUILTIN_PRESETS[name];
+  return b ? b.modules : (userPresets[name] || null);
+}
 function applyPreset(name) {
-  if (selectedTab == null) return; // need an active tab to apply to
-  const spec = BUILTIN_PRESETS[name] || userPresets[name];
+  if (selectedTab == null) { toast("Capture a tab first"); return; }
+  const spec = presetModules(name);
   if (!spec) return;
   const r = rack(); // applyPreset replaces the WHOLE rack - guard a non-empty one
   if (r && Array.isArray(r.modules) && r.modules.length && !confirm(`Replace this tab's rack with "${name}"?`)) return;
@@ -248,32 +268,78 @@ function applyPreset(name) {
 function savePreset() {
   const r = rack();
   if (!r) { alert("Capture a tab first."); return; }
-  const name = (prompt("Preset name:") || "").trim();
+  const name = (prompt("Save this rack as a preset named:") || "").trim();
   if (!name) return;
   if (BUILTIN_PRESETS[name]) { alert("That name is reserved by a built-in preset."); return; }
   userPresets[name] = JSON.parse(JSON.stringify(r.modules));
   savePresets();
   renderPresets();
-  presetSelectEl.value = name;
   toast(`Saved preset "${name}"`);
 }
-function deletePreset() {
-  const name = presetSelectEl.value;
-  if (!userPresets[name]) { alert("Built-in presets can't be deleted."); return; }
+function deletePresetByName(name) {
+  if (!userPresets[name]) return;
   if (!confirm(`Delete preset "${name}"?`)) return;
   delete userPresets[name];
   savePresets();
   renderPresets();
+  toast(`Deleted "${name}"`);
 }
-function renderPresets() {
-  const prev = presetSelectEl.value;
-  const opt = (n) => `<option>${escapeHtml(n)}</option>`;
-  const builtin = `<optgroup label="Built-in">${Object.keys(BUILTIN_PRESETS).map(opt).join("")}</optgroup>`;
-  const userNames = Object.keys(userPresets);
-  const user = userNames.length ? `<optgroup label="My presets">${userNames.map(opt).join("")}</optgroup>` : "";
-  presetSelectEl.innerHTML = builtin + user;
-  if (prev) presetSelectEl.value = prev;
+function renderPresets() { if (presetModalEl) buildPresetBody(); } // refresh the browser if it's open
+
+// ---------- preset browser (modal) ----------
+let presetModalEl = null;
+const chainTags = (modules) => modules.map((mm) => `<span class="pc-tag">${escapeHtml(TAGS[mm.type] || mm.type)}</span>`).join("");
+function presetCard(name, desc, modules, isUser) {
+  return `<button class="preset-card" data-name="${escapeHtml(name)}">
+      ${isUser ? `<span class="pc-del" title="Delete preset">✕</span>` : ""}
+      <span class="pc-name">${escapeHtml(name)}</span>
+      <span class="pc-desc">${escapeHtml(desc)}</span>
+      <span class="pc-chain">${chainTags(modules)}</span>
+    </button>`;
 }
+function buildPresetBody() {
+  const body = presetModalEl && presetModalEl.querySelector("#presetBody");
+  if (!body) return;
+  let html = "";
+  for (const cat of PRESET_CATS) {
+    const names = Object.keys(BUILTIN_PRESETS).filter((n) => BUILTIN_PRESETS[n].cat === cat);
+    if (!names.length) continue;
+    html += `<div class="preset-cat">${escapeHtml(cat)}</div><div class="preset-grid">${names.map((n) => presetCard(n, BUILTIN_PRESETS[n].desc, BUILTIN_PRESETS[n].modules, false)).join("")}</div>`;
+  }
+  const un = Object.keys(userPresets);
+  html += `<div class="preset-cat">My presets</div>`;
+  html += un.length
+    ? `<div class="preset-grid">${un.map((n) => presetCard(n, `${userPresets[n].length} module${userPresets[n].length === 1 ? "" : "s"}`, userPresets[n], true)).join("")}</div>`
+    : `<p class="preset-none">Build a rack, then “Save current rack…” to keep it here.</p>`;
+  body.innerHTML = html;
+  body.querySelectorAll(".preset-card").forEach((c) => {
+    c.addEventListener("click", (e) => {
+      if (e.target.closest(".pc-del")) { e.stopPropagation(); deletePresetByName(c.dataset.name); return; }
+      applyPreset(c.dataset.name); closePresetBrowser();
+    });
+  });
+}
+function openPresetBrowser() {
+  closePresetBrowser();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay";
+  ov.innerHTML = `
+    <div class="modal" role="dialog" aria-label="Rack presets">
+      <div class="modal-head"><h2>Rack presets</h2><button class="modal-x" title="Close">✕</button></div>
+      <div class="modal-body" id="presetBody"></div>
+      <div class="modal-foot">
+        <button id="presetSaveCur" class="primary">Save current rack…</button>
+        <span class="modal-hint">Choosing a preset replaces this tab's whole rack (one-step undo available).</span>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+  presetModalEl = ov;
+  buildPresetBody();
+  ov.querySelector(".modal-x").addEventListener("click", closePresetBrowser);
+  ov.querySelector("#presetSaveCur").addEventListener("click", savePreset);
+  ov.addEventListener("mousedown", (e) => { if (e.target === ov) closePresetBrowser(); });
+}
+function closePresetBrowser() { if (presetModalEl) { presetModalEl.remove(); presetModalEl = null; } }
 
 // ---------- per-module presets ----------
 const BUILTIN_MODULE_PRESETS = {
@@ -426,6 +492,7 @@ function renderRack() {
   listEl.innerHTML = "";
   const r = rack();
   if (!r) { listEl.innerHTML = `<li class="rack-empty">No tab selected.<br>Start one from the popup.</li>`; return; }
+  if (!r.modules.length) { listEl.innerHTML = `<li class="rack-empty">Empty rack.<br>Add a module above to get started.</li>`; return; }
   r.modules.forEach((m) => {
     const li = document.createElement("li");
     li.className = "module-item" + (m.id === r.selected ? " selected" : "") + (m.bypass ? " bypassed" : "");
@@ -512,14 +579,19 @@ function resetModule(m) {
   toast(`${m.name} reset to defaults`);
 }
 
-document.querySelectorAll("#addBtns button").forEach((b) =>
-  b.addEventListener("click", () => addModule(b.dataset.add))
+// add-module menu: one button opens a grouped picker with full names + descriptions
+const addBtnEl = document.getElementById("addBtn"), addMenuEl = document.getElementById("addMenu");
+function setAddMenu(open) { addMenuEl.hidden = !open; addBtnEl.setAttribute("aria-expanded", open ? "true" : "false"); addBtnEl.classList.toggle("on", open); }
+addBtnEl.addEventListener("click", (e) => { e.stopPropagation(); setAddMenu(addMenuEl.hidden); });
+addMenuEl.querySelectorAll("button").forEach((b) =>
+  b.addEventListener("click", () => { setAddMenu(false); addModule(b.dataset.add); })
 );
+document.addEventListener("click", (e) => { if (!addMenuEl.hidden && !e.target.closest("#addWrap")) setAddMenu(false); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") setAddMenu(false); });
 
-const presetSelectEl = document.getElementById("presetSelect");
-document.getElementById("presetApply").addEventListener("click", () => applyPreset(presetSelectEl.value));
+document.getElementById("presetBrowse").addEventListener("click", openPresetBrowser);
 document.getElementById("presetSave").addEventListener("click", savePreset);
-document.getElementById("presetDelete").addEventListener("click", deletePreset);
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePresetBrowser(); });
 
 // ---------- editor panel ----------
 const edEl = document.getElementById("moduleEditor");
@@ -527,9 +599,28 @@ function renderEditor() {
   if (viewCleanup) { viewCleanup(); viewCleanup = null; }
   currentDraw = null;
   const r = rack();
-  if (!r) { edEl.innerHTML = `<p class="empty">No tab captured. Start one from the popup.</p>`; return; }
-  const m = r.modules.find((x) => x.id === r.selected);
-  if (!m) { edEl.innerHTML = `<p class="empty">Add or select a module.</p>`; return; }
+  if (!r) {
+    edEl.innerHTML = `
+      <div class="onboard"><div class="onboard-card">
+        <h2>No tab captured yet</h2>
+        <ol>
+          <li>Open a tab that's playing audio</li>
+          <li>Click the <b>Tapdeck</b> toolbar icon, then <b>Start on this tab</b></li>
+          <li>Come back here to build and visualize your rack</li>
+        </ol>
+      </div></div>`;
+    return;
+  }
+  let m = r.modules.find((x) => x.id === r.selected);
+  if (!m && r.modules.length) { r.selected = r.modules[0].id; m = r.modules[0]; } // heal a stale selection
+  if (!m) {
+    edEl.innerHTML = `
+      <div class="onboard"><div class="onboard-card">
+        <h2>Empty rack</h2>
+        <p>Add your first module with <b>+ Add module</b> at the top-left. It'll open here, ready to dial in.</p>
+      </div></div>`;
+    return;
+  }
   if (m.type === "eq") renderEQ(m);
   else if (m.type === "comp") renderComp(m);
   else if (m.type === "limiter") renderLimiter(m);
@@ -554,7 +645,11 @@ function makeCanvas(canvas, aspect, onResize) {
     if (!cssW) return; // not laid out yet
     // when the container is fullscreen, fill it (both dimensions) instead of aspect
     const fs = document.fullscreenElement && document.fullscreenElement.contains(canvas);
-    const cssH = fs ? canvas.parentElement.clientHeight : Math.round(cssW * aspect);
+    let cssH = fs ? canvas.parentElement.clientHeight : Math.round(cssW * aspect);
+    // honour a CSS max-height (set via vertical media queries) so tall graphs can
+    // be capped to fit the viewport; the drawing is parametric on W/H, so a shorter
+    // canvas simply draws shorter rather than squashing.
+    if (!fs) { const mh = parseFloat(getComputedStyle(canvas).maxHeight); if (mh > 0 && cssH > mh) cssH = Math.round(mh); }
     const newW = Math.round(cssW * dpr), newH = Math.round(cssH * dpr);
     if (newW === W && newH === H) return; // no real change -> breaks the ResizeObserver feedback loop
     canvas.style.height = cssH + "px";
@@ -971,7 +1066,7 @@ function renderComp(m) {
       <button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button>
     </div>
     <div class="dyn">
-      <div class="graphwrap"><canvas id="compCanvas"></canvas></div>
+      <div class="graphwrap" title="Transfer curve: input level (x) maps to output level (y). The dot rides the curve at the live level; hover anywhere for a readout. Top strip = gain change over time."><canvas id="compCanvas"></canvas></div>
       <div>
         <div class="meterbox" style="margin-bottom:16px">
           <div><div class="meter" style="height:150px"><div class="fill" id="grFill"></div></div><div class="meter-label">GR <span id="grVal">0.0</span></div></div>
@@ -979,9 +1074,34 @@ function renderComp(m) {
         </div>
         <div class="knobs">${cKnobs.map((k) => k[1]).join("")}</div>
       </div>
+    </div>
+    <div class="det-flow">
+      <svg viewBox="0 0 270 100" class="det-svg" aria-hidden="true">
+        <defs><marker id="dfArrow" markerWidth="7" markerHeight="7" refX="3.2" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="currentColor"/></marker></defs>
+        <line x1="20" y1="34" x2="250" y2="34" class="sigwire" />
+        <circle cx="20" cy="34" r="3" class="node" /><text x="20" y="19">in</text>
+        <rect x="112" y="22" width="46" height="24" rx="5" class="box" /><text x="135" y="38" class="boxtxt">GAIN</text>
+        <circle cx="250" cy="34" r="3" class="node" /><text x="250" y="19">out</text>
+        <rect x="96" y="74" width="78" height="20" rx="5" class="box" /><text x="135" y="88" class="boxtxt">DETECTOR</text>
+        <path d="M135,74 L135,48" class="ctrl" marker-end="url(#dfArrow)" />
+        <path id="ffTap" class="tap" d="M70,34 L70,84 L96,84" />
+        <path id="fbTap" class="tap" d="M205,34 L205,84 L174,84" />
+      </svg>
+      <div class="det-text" id="detText"></div>
     </div>`;
   wireKnobs(m, cKnobs.map((k) => k[0]));
-  document.getElementById("det").addEventListener("change", (e) => { m.detector = e.target.value; pushParam(m); save(); });
+  function updateDetFlow() {
+    const ff = m.detector !== "feedback";
+    const ffEl = document.getElementById("ffTap"), fbEl = document.getElementById("fbTap"), txt = document.getElementById("detText");
+    if (!ffEl) return;
+    ffEl.classList.toggle("active", ff);
+    fbEl.classList.toggle("active", !ff);
+    txt.innerHTML = ff
+      ? `<b>Feed-forward</b> — the detector measures the <b>input</b>, before the gain stage. Precise and predictable; the modern default.`
+      : `<b>Feed-back</b> — the detector measures the gain stage's <b>output</b> (the previous sample), so it self-regulates into a softer, rounder knee — the classic, vintage character.`;
+  }
+  updateDetFlow();
+  document.getElementById("det").addEventListener("change", (e) => { m.detector = e.target.value; pushParam(m); save(); updateDetFlow(); });
   document.getElementById("cmode").addEventListener("change", (e) => { m.mode = e.target.value; pushParam(m); save(); renderEditor(); }); // full re-render so the preset bar + reset stay wired
 
   const canvas = document.getElementById("compCanvas");
@@ -1182,7 +1302,7 @@ function renderLimiter(m) {
       <div class="lim-graph" style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
         <div class="graphwrap"><canvas id="limCanvas"></canvas></div>
         <div class="lim-ctl" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
-          <label class="hint" style="display:flex; align-items:center; gap:8px; flex:1; min-width:160px">Zoom
+          <label class="hint" style="display:flex; align-items:center; gap:8px; flex:1; min-width:160px" title="Time shown across the graph. You can also scroll the wheel over the graph to zoom.">Zoom
             <input type="range" id="limZoom" min="50" max="8000" step="10" value="${m.zoom}" style="flex:1">
             <span id="limZoomV" style="min-width:52px; text-align:right">${m.zoom >= 1000 ? (m.zoom % 1000 ? (m.zoom / 1000).toFixed(1) : m.zoom / 1000) + " s" : m.zoom + " ms"}</span>
           </label>
@@ -1342,7 +1462,7 @@ function renderUtility(m) {
         ${tog("mono", "Mono")} ${tog("swap", "Swap L/R")} ${tog("invL", "Ø Left")} ${tog("invR", "Ø Right")}
       </div>
     </div>
-    <div class="graphwrap util-gonio"><canvas id="corrCanvas"></canvas></div>
+    <div class="graphwrap util-gonio" title="Goniometer: the stereo field (vertical = mono / in-phase, spread = stereo width). The bar below is L/R correlation (+1 mono, 0 wide, −1 out of phase)."><canvas id="corrCanvas"></canvas></div>
     <div class="xfeed-panel">
       <svg viewBox="0 0 240 120" class="xfeed-svg" aria-hidden="true">
         <circle cx="42" cy="26" r="6" fill="#36a3ff"></circle><text x="42" y="13">L</text>
@@ -1655,7 +1775,7 @@ function renderSat(m) {
       <label class="detsel" title="Run the waveshaper oversampled so its harmonics above Nyquist don't alias back as harshness. Higher = cleaner, more CPU.">Oversampling <select id="satOS">${osOpts}</select></label>
       <button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
     <div class="dyn">
-      <div class="graphwrap"><canvas id="satCanvas"></canvas></div>
+      <div class="graphwrap" title="Waveshaper curve: how the input (x) is reshaped into the output (y) at the current Drive. The diagonal is unity (no change)."><canvas id="satCanvas"></canvas></div>
       <div>
         <div class="meterbox" style="margin-bottom:16px"><div><div class="meter meter-up" style="height:120px"><div class="fill" id="satFill"></div></div><div class="meter-label">OUT <span id="satVal">-∞</span></div></div></div>
         <div class="knobs">
@@ -1691,7 +1811,7 @@ function renderTrans(m) {
   m.attack = m.attack ?? 0; m.sustain = m.sustain ?? 0; m.output = m.output ?? 0;
   edEl.innerHTML = `
     <div class="ed-head"><h1>${m.name}</h1><span class="tag">Transient shaper</span><button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
-    <div class="graphwrap"><canvas id="transCanvas"></canvas></div>
+    <div class="graphwrap" title="Live waveform: brighter overlay shows how Attack/Sustain reshape each transient's envelope versus the original."><canvas id="transCanvas"></canvas></div>
     <div class="knobs" style="max-width:540px;margin-top:16px">
       ${knob("attack", "Attack", m.attack, -100, 100, 1, "%")}
       ${knob("sustain", "Sustain", m.sustain, -100, 100, 1, "%")}
@@ -1728,7 +1848,7 @@ function renderGate(m) {
   edEl.innerHTML = `
     <div class="ed-head"><h1>${m.name}</h1><span class="tag">Gate / Expander</span><button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
     <div class="dyn">
-      <div class="graphwrap"><canvas id="gateCanvas"></canvas></div>
+      <div class="graphwrap" title="Top strip: input level vs threshold over time (green = gate open, red = gated). Below: transfer curve with the live operating dot. The GR meter shows reduction."><canvas id="gateCanvas"></canvas></div>
       <div>
         <div class="meterbox" style="margin-bottom:16px"><div><div class="meter" style="height:130px"><div class="fill" id="grFill"></div></div><div class="meter-label">GR <span id="grVal">0.0</span></div></div></div>
         <div class="knobs">
@@ -1744,18 +1864,65 @@ function renderGate(m) {
   wireKnobs(m, ["threshold", "ratio", "range", "attack", "release", "hold"]);
   const canvas = document.getElementById("gateCanvas"); const dims = makeCanvas(canvas, 1); const ctx = canvas.getContext("2d");
   const grFill = document.getElementById("grFill"), grVal = document.getElementById("grVal");
+  const lvlHist = []; const HISTMAX = 300; // input level over time, newest at the right
   currentDraw = function () {
     const { W, H, dpr } = dims(); ctx.clearRect(0, 0, W, H);
-    const X = (db) => ((db + 80) / 80) * W, Y = (db) => (1 - (db + 80) / 80) * H;
-    ctx.strokeStyle = "#1c2430"; ctx.lineWidth = 1 * dpr; ctx.fillStyle = "#56606e"; ctx.font = `${9 * dpr}px system-ui`;
-    for (let db = -80; db <= 0; db += 20) { const x = X(db); ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); const y = Y(db); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.fillText(db + "", 2, y - 2); }
+    const meter = (engine.meters && engine.meters[m.id]) || {};
+    const gr = Math.max(0, meter.gr || 0);
+    const level = typeof meter.level === "number" ? meter.level : -120;
+    lvlHist.push(engine.running ? level : -120);
+    while (lvlHist.length > HISTMAX) lvlHist.shift();
+    // gate state: open (passing), closing (partial), or shut
+    const open = gr < 0.5, shut = gr > Math.max(1, m.range) * 0.6;
+    const stCol = open ? "#3ad07a" : shut ? "#e5564b" : "#ffb454";
+
+    const topH = Math.round(H * 0.26), gh = H - topH;
+    const sY = (db) => topH - ((clamp(db, -80, 0) + 80) / 80) * (topH - 4 * dpr); // level → y in the top strip
+    const X = (db) => ((db + 80) / 80) * W;
+    const Y = (db) => topH + (1 - (db + 80) / 80) * gh; // transfer area below the strip
+
+    // ---------- top strip: live input level vs threshold (green open / red gated) ----------
+    ctx.fillStyle = open ? "rgba(58,208,122,0.06)" : "rgba(229,86,75,0.06)"; ctx.fillRect(0, 0, W, topH);
+    const sTh = sY(m.threshold);
+    ctx.fillStyle = "rgba(229,86,75,0.10)"; ctx.fillRect(0, sTh, W, topH - sTh); // below-threshold (gated) zone
+    ctx.strokeStyle = "rgba(255,180,84,0.55)"; ctx.setLineDash([4 * dpr, 3 * dpr]);
+    ctx.beginPath(); ctx.moveTo(0, sTh); ctx.lineTo(W, sTh); ctx.stroke(); ctx.setLineDash([]);
+    const nH = lvlHist.length;
+    if (nH > 1) {
+      const step = W / (HISTMAX - 1);
+      ctx.beginPath(); ctx.moveTo(W - (nH - 1) * step, topH);
+      for (let i = 0; i < nH; i++) ctx.lineTo(W - (nH - 1 - i) * step, sY(lvlHist[i]));
+      ctx.lineTo(W, topH); ctx.closePath();
+      ctx.fillStyle = "rgba(54,163,255,0.14)"; ctx.fill();
+      ctx.beginPath();
+      for (let i = 0; i < nH; i++) { const x = W - (nH - 1 - i) * step, y = sY(lvlHist[i]); i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.strokeStyle = "rgba(150,200,255,0.85)"; ctx.lineWidth = 1.3 * dpr; ctx.stroke();
+    }
+    // status pill
+    ctx.textBaseline = "top"; ctx.font = `${11 * dpr}px system-ui`;
+    ctx.fillStyle = stCol; ctx.fillText(open ? "OPEN" : shut ? "GATED" : "CLOSING", 7 * dpr, 5 * dpr);
+    ctx.fillStyle = "#8b929e"; ctx.fillText("thr " + m.threshold.toFixed(0) + " dB", 64 * dpr, 5 * dpr);
+
+    // ---------- transfer curve (below) ----------
+    ctx.strokeStyle = "#1c2430"; ctx.lineWidth = 1 * dpr; ctx.fillStyle = "#56606e"; ctx.font = `${9 * dpr}px system-ui`; ctx.textBaseline = "alphabetic";
+    for (let db = -80; db <= 0; db += 20) { const x = X(db); ctx.beginPath(); ctx.moveTo(x, topH); ctx.lineTo(x, H); ctx.stroke(); const y = Y(db); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.fillText(db + "", 2, y - 2); }
+    const tx = X(m.threshold);
+    ctx.fillStyle = "rgba(229,86,75,0.08)"; ctx.fillRect(0, topH, tx, gh); // gated region (input below threshold)
+    ctx.strokeStyle = "rgba(255,180,84,0.45)"; ctx.setLineDash([4 * dpr, 4 * dpr]); ctx.beginPath(); ctx.moveTo(tx, topH); ctx.lineTo(tx, H); ctx.stroke(); ctx.setLineDash([]);
     ctx.strokeStyle = "#3a4452"; ctx.beginPath(); ctx.moveTo(X(-80), Y(-80)); ctx.lineTo(X(0), Y(0)); ctx.stroke();
-    const tx = X(m.threshold); ctx.strokeStyle = "rgba(255,180,84,0.35)"; ctx.setLineDash([4 * dpr, 4 * dpr]); ctx.beginPath(); ctx.moveTo(tx, 0); ctx.lineTo(tx, H); ctx.stroke(); ctx.setLineDash([]);
     const curveOut = (inDb) => { const over = inDb - m.threshold; return inDb + (over >= 0 ? 0 : -Math.min(m.range, -over * (m.ratio - 1))); };
     ctx.save(); ctx.shadowColor = "rgba(54,163,255,0.6)"; ctx.shadowBlur = 6 * dpr; ctx.beginPath();
     for (let inDb = -80; inDb <= 0; inDb += 0.5) { const x = X(inDb), y = Y(clamp(curveOut(inDb), -80, 0)); inDb === -80 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
     ctx.strokeStyle = "#36a3ff"; ctx.lineWidth = 2.2 * dpr; ctx.stroke(); ctx.restore();
-    const meter = (engine.meters && engine.meters[m.id]) || {}; const gr = Math.max(0, meter.gr || 0);
+
+    // live operating dot on the curve, coloured by gate state
+    if (engine.running && level > -100) {
+      const inDb = clamp(level, -80, 0), x = X(inDb), y = Y(clamp(curveOut(inDb), -80, 0));
+      ctx.strokeStyle = "rgba(255,255,255,0.22)"; ctx.setLineDash([3 * dpr, 3 * dpr]); ctx.lineWidth = 1 * dpr;
+      ctx.beginPath(); ctx.moveTo(x, H); ctx.lineTo(x, y); ctx.lineTo(0, y); ctx.stroke(); ctx.setLineDash([]);
+      ctx.save(); ctx.shadowColor = stCol; ctx.shadowBlur = 10 * dpr; ctx.beginPath(); ctx.arc(x, y, 4.5 * dpr, 0, Math.PI * 2); ctx.fillStyle = stCol; ctx.fill(); ctx.restore();
+    }
+
     grFill.style.height = clamp(gr / Math.max(1, m.range), 0, 1) * 100 + "%"; grVal.textContent = gr.toFixed(1);
   };
 }
