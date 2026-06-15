@@ -2319,12 +2319,23 @@ function showAgMeasured(m, an) {
   if (meas) { meas.disabled = false; meas.textContent = "▶ Measure (5s)"; }
   if (!out) return;
   if (an.n > 50 && an.lufs > -120) {
-    const diff = an.lufs - m.target;
-    const rel = Math.abs(diff) < 0.5 ? "right at" : diff > 0 ? `${diff.toFixed(1)} dB over` : `${(-diff).toFixed(1)} dB under`;
-    out.innerHTML = `Program loudness <b>${an.lufs.toFixed(1)} LUFS</b> - ${rel} your ${m.target} target. <button class="ag-link" id="agMatch">Match content (${Math.round(an.lufs)})</button>`;
-    const mb = agModalEl.querySelector("#agMatch");
-    if (mb) mb.addEventListener("click", () => setAgTarget(m, Math.round(an.lufs)));
-  } else out.textContent = "Couldn't measure - is audio playing?";
+    const gap = m.target - an.lufs; // + = the content needs a boost to reach the target
+    const need = Math.min(24, Math.max(3, Math.ceil(Math.abs(gap)) + 3)); // Max gain that covers it, with headroom
+    const dir = Math.abs(gap) < 0.5 ? "right at your target" : `${Math.abs(gap).toFixed(1)} dB ${gap > 0 ? "under" : "over"} your ${m.target} LUFS target`;
+    const reach = Math.abs(gap) <= m.range;
+    out.innerHTML = `
+      <div class="ag-result">
+        <div class="ag-meas">Measured <b>${an.lufs.toFixed(1)} LUFS</b> - ${dir}.</div>
+        <div class="ag-reach">${reach ? "Your current Max gain can already reach it ✓" : `It needs about ${Math.abs(gap).toFixed(0)} dB to get there, but Max gain is only ±${m.range} dB.`}</div>
+        <button class="ag-apply" id="agApply">Set Max gain to reach target (±${need} dB)</button>
+      </div>`;
+    const ab = agModalEl.querySelector("#agApply");
+    if (ab) ab.addEventListener("click", () => {
+      const inp = document.getElementById("k_range");
+      if (inp) { inp.value = need; inp.dispatchEvent(new Event("input")); }
+      ab.textContent = `Max gain set to ±${need} dB ✓`; ab.classList.add("done"); ab.disabled = true;
+    });
+  } else out.textContent = "Couldn't measure - is audio playing? Play a few seconds and measure again.";
 }
 function openAgForm(m) {
   closeAgForm();
@@ -2337,12 +2348,10 @@ function openAgForm(m) {
       <div class="modal-body">
         <div class="form-step">1 &middot; Target loudness</div>
         <div class="ag-targets">${T.map(([v, l, d]) => `<button class="ag-target" data-t="${v}"><b>${l}</b><span>${v} LUFS</span><small>${d}</small></button>`).join("")}</div>
-        <div class="form-step">2 &middot; Measure your content</div>
-        <p class="hint" style="font-style:normal; margin:0 0 10px">Play a representative few seconds, then measure the program loudness to pick a target relative to it.</p>
-        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
-          <button id="agMeasure" class="ed-toggle">▶ Measure (5s)</button>
-          <span id="agMeasured" class="hint" style="font-style:normal">Not measured yet.</span>
-        </div>
+        <div class="form-step">2 &middot; Measure &amp; reach it</div>
+        <p class="hint" style="font-style:normal; margin:0 0 10px">Play a representative few seconds and measure the program loudness - we'll show how far it is from your target and set enough Max gain to get there.</p>
+        <button id="agMeasure" class="ed-toggle">▶ Measure (5s)</button>
+        <div id="agMeasured" class="hint" style="font-style:normal; margin-top:12px">Not measured yet.</div>
       </div>
       <div class="modal-foot"><button id="agDone" class="primary">Done</button><span class="modal-hint">Target also lives on the knob - this is a quick chooser.</span></div>
     </div>`;
