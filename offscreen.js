@@ -297,6 +297,7 @@ function makeNode(s, type) {
       }
       if (typeof d.lufsM === "number") { m.lufsM = d.lufsM; m.lufsS = d.lufsS; m.lufsI = d.lufsI; m.peak = d.peak; }
     }
+    if (d.analysis) m.analysis = d.analysis; // de-reverb auto-analysis result
   };
   return node;
 }
@@ -364,7 +365,7 @@ function poll(tabId) {
       gr: m.gr || 0, level: m.level, trace: m.traceQ && m.traceQ.length ? m.traceQ : null,
       mb: m.mb, corr: m.corr, rmsL: m.rmsL, rmsR: m.rmsR,
       scope: m.scopeQ && m.scopeQ.length ? m.scopeQ : null,
-      lufsM: m.lufsM, lufsS: m.lufsS, lufsI: m.lufsI, peak: m.peak, tp: m.tp,
+      lufsM: m.lufsM, lufsS: m.lufsS, lufsI: m.lufsI, peak: m.peak, tp: m.tp, analysis: m.analysis,
     };
     if (m.traceQ) m.traceQ = []; // hand over and clear, like the spectrogram columns
     if (m.scopeQ) m.scopeQ = [];

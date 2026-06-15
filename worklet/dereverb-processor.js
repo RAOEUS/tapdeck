@@ -88,13 +88,46 @@ class DereverbProcessor extends AudioWorkletProcessor {
     this.chans = [new Chan(win, winNorm, fftp), new Chan(win, winNorm, fftp)];
     this.dispEnv = 0; this.dispRel = Math.exp(-1 / (0.03 * sampleRate)); // ~30 ms display envelope
     this.trace = [];
+    // auto-analysis: estimate the room's reverb decay from falling-envelope slopes
+    this.anLeft = 0; this.aid = 0; this.slopes = []; this.peakHold = -120; this.prevDb = -120;
     this.port.onmessage = (e) => {
       const d = e.data || {};
       if (typeof d.amount === "number") this.amount = d.amount;
       if (typeof d.tail === "number") this.tail = d.tail;
       if (typeof d.residual === "number") this.residual = d.residual;
       if (typeof d.mix === "number") this.mix = d.mix;
+      if (typeof d.analyze === "number") { this.anLeft = Math.round(d.analyze * sampleRate); this.slopes = []; this.peakHold = -120; this.prevDb = -120; }
     };
+  }
+
+  // collect the decay rate (dB/s) of falling tails this quantum; when the window
+  // ends, derive a reverb time and post suggested { tail, amount }.
+  analyze(input, n, chans) {
+    let sq = 0;
+    for (let ch = 0; ch < chans; ch++) { const a = input[ch]; for (let i = 0; i < n; i++) sq += a[i] * a[i]; }
+    const curDb = 10 * Math.log10(sq / (n * chans) + 1e-12);
+    const dt = n / sampleRate;
+    this.peakHold = Math.max(curDb, this.peakHold - 3 * dt); // recent peak; decays slower than any reverb so tails stay "below peak"
+    // a falling level, in the tail region below the peak and above the floor, = reverb decay
+    if (curDb < this.prevDb - 0.01 && curDb < this.peakHold - 3 && curDb > -65) {
+      const slope = (this.prevDb - curDb) / dt;
+      if (slope > 2 && slope < 300) this.slopes.push(slope);
+    }
+    this.prevDb = curDb;
+    this.anLeft -= n;
+    if (this.anLeft <= 0) {
+      this.aid++;
+      let tail = 300, amount = 55, nslopes = this.slopes.length;
+      if (nslopes >= 20) {
+        const s = this.slopes.slice().sort((a, b) => a - b);
+        const med = s[s.length >> 1];
+        const rt60 = Math.min(2.5, Math.max(0.1, 60 / med)); // seconds
+        tail = Math.round(Math.min(1500, Math.max(60, rt60 * 1000 * 0.5)));
+        amount = Math.round(Math.min(85, Math.max(35, 35 + rt60 * 45)));
+      }
+      this.port.postMessage({ type: "meter", analysis: { tail, amount, aid: this.aid, n: nslopes } });
+      this.slopes = [];
+    }
   }
 
   process(inputs, outputs) {
@@ -121,6 +154,8 @@ class DereverbProcessor extends AudioWorkletProcessor {
     this.dispEnv = inPeak > this.dispEnv ? inPeak : inPeak + (this.dispEnv - inPeak) * this.dispRel;
     this.trace.push(20 * Math.log10(this.dispEnv + 1e-9), Math.max(0, redDb));
     if (this.trace.length >= 16) { this.port.postMessage({ type: "meter", s: this.trace }); this.trace = []; }
+
+    if (this.anLeft > 0) this.analyze(input, n, chans);
     return true;
   }
 }

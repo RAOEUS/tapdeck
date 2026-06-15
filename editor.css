@@ -166,6 +166,7 @@ body {
 .ed-toggle { background: var(--panel2); color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 5px 11px; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
 .ed-toggle:hover { border-color: var(--accent); color: var(--text); }
 .ed-toggle.on { border-color: var(--accent); color: var(--accent); background: #14202e; }
+.ed-toggle:disabled { opacity: .6; cursor: default; }
 .empty { color: var(--muted); margin-top: 60px; text-align: center; }
 .onboard { display: flex; justify-content: center; padding-top: 52px; }
 .onboard-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 30px; max-width: 480px; box-shadow: var(--nm-out-sm); }

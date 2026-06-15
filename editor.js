@@ -2032,11 +2032,12 @@ function renderDenoise(m) {
 }
 
 // ===================== De-reverb =====================
+const drvAnAid = {}; // module id -> last applied analysis id (apply each result once)
 function renderDereverb(m) {
   m.amount = m.amount ?? 50; m.tail = m.tail ?? 300; m.residual = m.residual ?? 12; m.mix = m.mix ?? 100;
   m.zoom = m.zoom ?? 2500;
   edEl.innerHTML = `
-    ${edHead(m.name, "De-reverb")}
+    ${edHead(m.name, "De-reverb", `<button id="drvAnalyze" class="ed-toggle" title="Listen to a few seconds of the playing audio and auto-set Tail &amp; Amount from the room's reverb decay. Works best on speech or music with natural pauses.">✨ Analyze room</button>`)}
     <div class="dyn">
       <div class="lim-graph" style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
         <div class="graphwrap" title="Input level (blue) vs the de-reverbed output (green). The red is the reverb tail being removed — watch it shrink between words/notes as you raise Amount."><canvas id="drvCanvas"></canvas></div>
@@ -2058,6 +2059,16 @@ function renderDereverb(m) {
     <p class="hint" style="margin-top:14px; font-style:normal"><b>Amount</b> = how hard the decaying tails are pulled down · <b>Tail</b> = how long a reverb to chase (set near the room's decay) · <b>Residual</b> leaves a little tail so it stays natural · onsets and steady notes pass through untouched. (Latency ~8 ms.)</p>`;
   wireKnobs(m, ["amount", "tail", "residual", "mix"]);
   const atkTip = document.getElementById("k_amount"); if (atkTip) atkTip.closest(".knob").title = "0% = bypass. Higher pulls reverb decays down harder.";
+  const resTip = document.getElementById("k_residual"); if (resTip) resTip.closest(".knob").title = "How much reverb tail to leave behind. 0% = maximum removal (can sound gated/unnatural); raise it to keep some natural room ambience and avoid artefacts.";
+  const tailTip = document.getElementById("k_tail"); if (tailTip) tailTip.closest(".knob").title = "Roughly the reverb decay time to chase — match it to the room. Longer removes longer tails (but can start thinning sustained notes).";
+  const anBtn = document.getElementById("drvAnalyze");
+  anBtn.addEventListener("click", () => {
+    if (selectedTab == null) { toast("Capture a tab first"); return; }
+    send({ type: "set-param", tabId: selectedTab, id: m.id, params: { analyze: 4 } });
+    anBtn.disabled = true; let left = 4; anBtn.textContent = `Listening ${left}s…`;
+    const iv = setInterval(() => { left--; anBtn.textContent = left > 0 ? `Listening ${left}s…` : "Analyzing…"; if (left <= 0) clearInterval(iv); }, 1000);
+    setTimeout(() => { anBtn.disabled = false; anBtn.textContent = "✨ Analyze room"; }, 5400); // fallback re-enable
+  });
 
   const canvas = document.getElementById("drvCanvas");
   const dims = makeCanvas(canvas, 0.42);
@@ -2075,6 +2086,19 @@ function renderDereverb(m) {
   currentDraw = function () {
     const { W, H, dpr } = dims();
     const me = (engine.meters && engine.meters[m.id]) || {};
+    // apply an auto-analysis result once (when its id changes)
+    const an = me.analysis;
+    if (an && drvAnAid[m.id] !== an.aid) {
+      drvAnAid[m.id] = an.aid;
+      if (an.n >= 20) {
+        const setK = (key, val) => { const inp = document.getElementById("k_" + key); if (inp) { inp.value = val; inp.dispatchEvent(new Event("input")); } };
+        setK("tail", an.tail); setK("amount", an.amount);
+        toast(`Analyzed room · Tail ${an.tail} ms · Amount ${an.amount}%`);
+      } else {
+        toast("Couldn't read the reverb — play audio with pauses, then Analyze again");
+      }
+      anBtn.disabled = false; anBtn.textContent = "✨ Analyze room";
+    }
     if (engine.running && me.trace) for (const pr of me.trace) { histIn.push(pr[0]); histRed.push(pr[1]); }
     if (histIn.length > MAXHIST) { const ex = histIn.length - MAXHIST; histIn.splice(0, ex); histRed.splice(0, ex); }
 
