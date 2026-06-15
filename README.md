@@ -43,6 +43,7 @@ needs a live user gesture that doesn't survive the hop to the worker.
 | **Compressor** | Down / Up / Expand / OTT modes, soft knee, **feed-forward / feed-back** detection, parallel mix, **sidechain HPF**. |
 | **Multiband** | Linkwitz-Riley split into N bands, a compressor per band, OTT-capable. |
 | **Gate / Expander** | Threshold/ratio/range/attack/release/hold with a live open/closed + level display. |
+| **Auto Gain** | Loudness leveler (AGC): rides a slow gain to hold a target LUFS — evens out quiet/loud content, with a gate and range limit, and a scrolling loudness display. |
 | **Denoise** | Spectral noise suppressor (min-statistics + Wiener gate). 0% = transparent. |
 | **De-reverb** | STFT decay-expander: pulls down reverb tails while passing transients and sustained notes, with a scrolling input-vs-output display. |
 | **Transient** | Attack / sustain envelope shaping. |

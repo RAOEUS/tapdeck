@@ -19,12 +19,13 @@ const WORKLETS = {
   gate: "worklet/gate-processor.js",
   denoise: "worklet/denoise-processor.js",
   dereverb: "worklet/dereverb-processor.js",
+  autogain: "worklet/autogain-processor.js",
   spectrum: "worklet/spectrum-processor.js",
 };
 const PROCESSOR = {
   eq: "eq-processor", comp: "comp-processor", limiter: "limiter-processor",
   utility: "utility-processor", mbcomp: "mbcomp-processor",
-  sat: "sat-processor", trans: "trans-processor", gate: "gate-processor", denoise: "denoise-processor", dereverb: "dereverb-processor",
+  sat: "sat-processor", trans: "trans-processor", gate: "gate-processor", denoise: "denoise-processor", dereverb: "dereverb-processor", autogain: "autogain-processor",
 };
 
 const FREQ_MIN = 20, FREQ_MAX = 20000, LOGN = 2048;

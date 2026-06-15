@@ -105,6 +105,7 @@ function defaultModule(type) {
   if (type === "gate") return { ...base, name: "Gate", threshold: -45, ratio: 4, range: 50, attack: 1, release: 120, hold: 12 };
   if (type === "denoise") return { ...base, name: "Denoise", amount: 60, floor: 6 };
   if (type === "dereverb") return { ...base, name: "De-reverb", amount: 50, tail: 300, residual: 12, mix: 100, autoMakeup: true };
+  if (type === "autogain") return { ...base, name: "Auto Gain", target: -16, speed: 50, range: 12, gate: -45 };
   if (type === "mbcomp") return { ...base, name: "Multiband", selBand: 0, mix: 100, xovers: [250, 2500], bands: [
     { threshold: -24, ratio: 3, attack: 15, release: 150, knee: 6, makeup: 0, bypass: false, detector: "feedforward", mode: "down", range: 24 },
     { threshold: -22, ratio: 3, attack: 10, release: 120, knee: 6, makeup: 0, bypass: false, detector: "feedforward", mode: "down", range: 24 },
@@ -126,6 +127,7 @@ function paramsFor(m) {
   if (m.type === "gate") return { threshold: m.threshold, ratio: m.ratio, range: m.range, attack: m.attack, release: m.release, hold: m.hold };
   if (m.type === "denoise") return { amount: m.amount, floor: m.floor };
   if (m.type === "dereverb") return { amount: m.amount, tail: m.tail, residual: m.residual, mix: m.mix, autoMakeup: m.autoMakeup };
+  if (m.type === "autogain") return { target: m.target, speed: m.speed, range: m.range, gate: m.gate };
   return {}; // analyzer has nothing to send
 }
 function send(msg) { try { chrome.runtime.sendMessage({ target: "offscreen", ...msg }); } catch {} }
@@ -467,6 +469,13 @@ const BUILTIN_MODULE_PRESETS = {
     "Voice (strong)": { amount: 78, floor: 5 },
     "Aggressive": { amount: 92, floor: 3 },
   },
+  autogain: {
+    "General Listening": { target: -16, speed: 45, range: 12, gate: -45 },
+    "Dialog / Podcast": { target: -16, speed: 70, range: 15, gate: -42 },
+    "Gentle (album)": { target: -18, speed: 20, range: 9, gate: -48 },
+    "Aggressive Leveler": { target: -14, speed: 85, range: 18, gate: -40 },
+    "Quiet Boost": { target: -14, speed: 50, range: 24, gate: -50 },
+  },
   dereverb: {
     "Light": { amount: 35, tail: 250, residual: 18, mix: 100 },
     "Room": { amount: 55, tail: 350, residual: 12, mix: 100 },
@@ -544,7 +553,7 @@ function injectModulePresetBar(m, selectName) {
 
 // ---------- rack list (with drag-and-drop) ----------
 const listEl = document.getElementById("moduleList");
-const TAGS = { eq: "EQ", comp: "Comp", limiter: "Limiter", utility: "Util", mbcomp: "MBand", analyzer: "Scope", sat: "Sat", trans: "Trans", gate: "Gate", denoise: "Denoise", dereverb: "Dereverb" };
+const TAGS = { eq: "EQ", comp: "Comp", limiter: "Limiter", utility: "Util", mbcomp: "MBand", analyzer: "Scope", sat: "Sat", trans: "Trans", gate: "Gate", denoise: "Denoise", dereverb: "Dereverb", autogain: "AutoGain" };
 let dragId = null;
 
 function renderRack() {
@@ -692,6 +701,7 @@ function renderEditor() {
   else if (m.type === "gate") renderGate(m);
   else if (m.type === "denoise") renderDenoise(m);
   else if (m.type === "dereverb") renderDereverb(m);
+  else if (m.type === "autogain") renderAutoGain(m);
   else renderAnalyzer(m);
   const rb = document.getElementById("resetMod");
   if (rb) rb.onclick = () => resetModule(m);
@@ -2149,6 +2159,98 @@ function renderDereverb(m) {
     grHold = gr > grHold ? gr : grHold * 0.9 + gr * 0.1;
     grFill.style.height = clamp(gr / 24, 0, 1) * 100 + "%";
     grVal.textContent = gr.toFixed(1);
+  };
+}
+
+// ===================== Auto Gain (loudness leveler) =====================
+function renderAutoGain(m) {
+  m.target = m.target ?? -16; m.speed = m.speed ?? 50; m.range = m.range ?? 12; m.gate = m.gate ?? -45; m.zoom = m.zoom ?? 8000;
+  edEl.innerHTML = `
+    ${edHead(m.name, "Loudness leveler")}
+    <div class="lim-graph" style="display:flex; flex-direction:column; gap:8px">
+      <div class="graphwrap" title="Input loudness (blue) vs the leveled output (green) over time, with the target (dashed). The output rides toward the target; the shaded gap is the gain being applied."><canvas id="agCanvas"></canvas></div>
+      <label class="hint" style="display:flex; align-items:center; gap:8px">Zoom
+        <input type="range" id="agZoom" min="2000" max="30000" step="500" value="${m.zoom}" style="flex:1">
+        <span id="agZoomV" style="min-width:44px; text-align:right">${Math.round(m.zoom / 1000)} s</span>
+      </label>
+    </div>
+    <div class="knobs" style="max-width:640px; margin-top:14px; grid-template-columns:repeat(4,1fr)">
+      ${knob("target", "Target", m.target, -30, -6, 0.5, " LUFS")}
+      ${knob("speed", "Speed", m.speed, 0, 100, 1, "")}
+      ${knob("range", "Max gain", m.range, 0, 24, 1, " dB")}
+      ${knob("gate", "Gate", m.gate, -70, -20, 1, " LUFS")}
+    </div>
+    <p class="hint" id="agReadout" style="margin-top:12px; font-style:normal">Listening…</p>`;
+  wireKnobs(m, ["target", "speed", "range", "gate"]);
+  const tip = (key, t) => { const e = document.getElementById("k_" + key); if (e) e.closest(".knob").title = t; };
+  tip("target", "The loudness to aim for (LUFS). Around -16 suits general listening; lower targets are louder. Matches the Limiter's LUFS meter.");
+  tip("speed", "How quickly it adapts. Lower = album-style (rides slowly, preserves dynamics); higher = dialog-style (levels fast). Boosting is always slower than cutting.");
+  tip("range", "The maximum the gain will move, up or down (± dB). Keeps it from over-boosting quiet passages or over-cutting loud ones.");
+  tip("gate", "Below this loudness the gain freezes, so it never pumps up silence or background noise between sounds.");
+
+  const canvas = document.getElementById("agCanvas");
+  const dims = makeCanvas(canvas, 0.42);
+  const ctx = canvas.getContext("2d");
+  const readout = document.getElementById("agReadout");
+  const zoomEl = document.getElementById("agZoom"), zoomV = document.getElementById("agZoomV");
+  let zoomMs = m.zoom;
+  function setZoom(v) { zoomMs = clamp(Math.round(v), 2000, 30000); m.zoom = zoomMs; zoomEl.value = zoomMs; zoomV.textContent = Math.round(zoomMs / 1000) + " s"; save(); }
+  zoomEl.addEventListener("input", () => setZoom(+zoomEl.value));
+  canvas.addEventListener("wheel", (e) => { e.preventDefault(); setZoom(zoomMs * (e.deltaY > 0 ? 1.15 : 1 / 1.15)); }, { passive: false });
+
+  const DBMIN = -50, DBMAX = 0, MAXHIST = 6500, MAXDRAW = 1200;
+  const histL = [], histG = []; // input loudness (LUFS) + applied gain (dB)
+  currentDraw = function () {
+    const { W, H, dpr } = dims();
+    const me = (engine.meters && engine.meters[m.id]) || {};
+    if (engine.running && me.trace) for (const pr of me.trace) { histL.push(pr[0]); histG.push(pr[1]); }
+    if (histL.length > MAXHIST) { const ex = histL.length - MAXHIST; histL.splice(0, ex); histG.splice(0, ex); }
+
+    const Y = (db) => (1 - (clamp(db, DBMIN, DBMAX) - DBMIN) / (DBMAX - DBMIN)) * H;
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = "#1c2430"; ctx.lineWidth = 1 * dpr; ctx.fillStyle = "#3a4452"; ctx.font = `${10 * dpr}px system-ui`; ctx.textBaseline = "middle"; ctx.textAlign = "right";
+    for (let db = 0; db >= -50; db -= 10) { const y = Y(db); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.fillText(db, W - 3 * dpr, y); }
+    ctx.textAlign = "left";
+    // target line
+    const ty = Y(m.target);
+    ctx.strokeStyle = "rgba(255,180,84,0.6)"; ctx.setLineDash([5 * dpr, 4 * dpr]); ctx.beginPath(); ctx.moveTo(0, ty); ctx.lineTo(W, ty); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = "rgba(255,180,84,0.85)"; ctx.textBaseline = "top"; ctx.fillText("target " + m.target.toFixed(0) + " LUFS", 6 * dpr, ty + 3 * dpr);
+
+    const len = histL.length;
+    const colsPerSec = (engine.sampleRate || 48000) / 256; // one trace pair per 256-sample step
+    const vc = clamp(Math.round((zoomMs / 1000) * colsPerSec), 8, Math.max(8, len));
+    let lastL = -120, lastG = 0;
+    if (len > 1) {
+      const start = len - vc, drawN = Math.min(vc, MAXDRAW);
+      const inV = new Float32Array(drawN), gV = new Float32Array(drawN);
+      for (let k = 0; k < drawN; k++) {
+        const idx = Math.min(len - 1, start + Math.floor(((k + 0.5) * vc) / drawN));
+        inV[k] = histL[idx]; gV[k] = histG[idx];
+      }
+      const xAt = (k) => (drawN <= 1 ? W : (k / (drawN - 1)) * W);
+      const outAt = (k) => inV[k] + gV[k];
+      // gap between input and output = the gain applied
+      ctx.beginPath();
+      for (let k = 0; k < drawN; k++) ctx.lineTo(xAt(k), Y(inV[k]));
+      for (let k = drawN - 1; k >= 0; k--) ctx.lineTo(xAt(k), Y(outAt(k)));
+      ctx.closePath(); ctx.fillStyle = "rgba(54,163,255,0.12)"; ctx.fill();
+      // input loudness line
+      ctx.beginPath();
+      for (let k = 0; k < drawN; k++) { const x = xAt(k), y = Y(inV[k]); k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.strokeStyle = "rgba(120,180,235,0.7)"; ctx.lineWidth = 1.1 * dpr; ctx.stroke();
+      // leveled output line
+      ctx.beginPath();
+      for (let k = 0; k < drawN; k++) { const x = xAt(k), y = Y(outAt(k)); k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.strokeStyle = "rgba(120,232,160,0.95)"; ctx.lineWidth = 1.6 * dpr; ctx.stroke();
+      lastL = histL[len - 1]; lastG = histG[len - 1];
+    }
+    ctx.textBaseline = "top"; ctx.font = `${10 * dpr}px system-ui`;
+    ctx.fillStyle = "rgba(150,200,255,0.85)"; ctx.fillText("input", 6 * dpr, 4 * dpr);
+    ctx.fillStyle = "rgba(120,232,160,0.95)"; ctx.fillText("leveled output", 46 * dpr, 4 * dpr);
+
+    if (engine.running && lastL > -100) {
+      readout.innerHTML = `Gain <b>${lastG >= 0 ? "+" : ""}${lastG.toFixed(1)} dB</b> &nbsp;·&nbsp; In <b>${lastL.toFixed(1)} LUFS</b> → <b>${(lastL + lastG).toFixed(1)}</b> (target ${m.target.toFixed(0)})`;
+    } else readout.textContent = engine.running ? "Listening for signal…" : "Engine idle";
   };
 }
 
