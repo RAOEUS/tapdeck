@@ -183,7 +183,7 @@ function defaultModule(type) {
     { id: nid(), type: "peaking", freq: 1000, gain: 0, q: 1, enabled: true },
     { id: nid(), type: "peaking", freq: 6000, gain: 0, q: 1, enabled: true },
   ] };
-  if (type === "comp") return { ...base, name: "Compressor", threshold: -18, ratio: 4, ratioUp: 4, attack: 10, release: 120, knee: 6, makeup: 0, detector: "feedforward", mode: "down", range: 24, mix: 100, scHpf: 20 };
+  if (type === "comp") return { ...base, name: "Compressor", threshold: -18, ratio: 4, ratioUp: 4, attack: 10, release: 120, knee: 6, makeup: 0, detector: "feedforward", mode: "down", range: 24, mix: 100, scHpf: 20, autoMakeup: false };
   if (type === "limiter") return { ...base, name: "Limiter", inputGain: 0, ceiling: -1, attack: 0, release: 60, hold: 5, lookahead: 5, link: 100, os: 1, style: "transparent", unity: false, dc: false, zoom: 1000 };
   if (type === "utility") return { ...base, name: "Utility", gain: 0, pan: 0, width: 1, mono: false, invL: false, invR: false, swap: false, crossfeed: 0 };
   if (type === "sat") return { ...base, name: "Saturator", drive: 6, mode: "tube", tone: 0, mix: 100, output: 0, os: 2 };
@@ -204,7 +204,7 @@ function defaultModule(type) {
 // ---------- messaging to engine ----------
 function paramsFor(m) {
   if (m.type === "eq") return { bands: m.bands, preamp: m.preamp || 0, mix: m.mix ?? 100, chMode: m.chMode || "stereo" };
-  if (m.type === "comp") return { threshold: m.threshold, ratio: m.ratio, ratioUp: m.ratioUp, attack: m.attack, release: m.release, knee: m.knee, makeup: m.makeup, detector: m.detector, mode: m.mode, range: m.range, mix: m.mix, scHpf: m.scHpf };
+  if (m.type === "comp") return { threshold: m.threshold, ratio: m.ratio, ratioUp: m.ratioUp, attack: m.attack, release: m.release, knee: m.knee, makeup: m.makeup, detector: m.detector, mode: m.mode, range: m.range, mix: m.mix, scHpf: m.scHpf, autoMakeup: m.autoMakeup };
   if (m.type === "limiter") return { inputGain: m.inputGain, ceiling: m.ceiling, attack: m.attack, release: m.release, hold: m.hold, lookahead: m.lookahead, link: m.link, os: m.os, style: m.style, unity: m.unity, dc: m.dc };
   if (m.type === "utility") return { gain: m.gain, pan: m.pan, width: m.width, mono: m.mono, invL: m.invL, invR: m.invR, swap: m.swap, crossfeed: m.crossfeed || 0 };
   if (m.type === "mbcomp") return { xovers: m.xovers, bands: m.bands, mix: m.mix };
@@ -283,10 +283,10 @@ const BUILTIN_PRESETS = {
   "Flat (reference)": { cat: "Listening", desc: "Unprocessed - a clean reference with the analyzer.", modules: [EQm([eb("peaking", 100, 0, 1), eb("peaking", 1000, 0, 1), eb("peaking", 8000, 0, 1)]), Am()] },
   "Bass Boost": { cat: "Listening", desc: "Deeper low end with a touch of air on top.", modules: [EQm([eb("lowshelf", 90, 6, 0.7), eb("peaking", 300, -1.5, 1), eb("highshelf", 10000, 2, 0.7)])] },
   "Loudness Smile": { cat: "Listening", desc: "Smiley curve - fuller lows and brighter highs.", modules: [EQm([eb("lowshelf", 80, 5, 0.7), eb("peaking", 1000, -2, 0.8), eb("highshelf", 8000, 4, 0.7)])] },
-  "Vocal Clarity": { cat: "Listening", desc: "Lifts speech and vocals out of a busy mix.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 350, -3, 1.2), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -20, ratio: 3, attack: 8, makeup: 2 })] },
+  "Vocal Clarity": { cat: "Listening", desc: "Lifts speech and vocals out of a busy mix.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 350, -3, 1.2), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -20, ratio: 3, attack: 8, autoMakeup: true })] },
   "Warm & Smooth": { cat: "Listening", desc: "Tube warmth that softens digital harshness.", modules: [Sm({ drive: 5, mode: "tube", tone: -15, mix: 60 }), EQm([eb("lowshelf", 120, 1.5, 0.7), eb("highshelf", 9000, -2, 0.7)])] },
   "Air & Clarity": { cat: "Listening", desc: "Cuts mud, adds presence and high-end sparkle.", modules: [EQm([eb("peaking", 300, -2, 1), eb("peaking", 4000, 2, 1.2), eb("highshelf", 11000, 3, 0.7)])] },
-  "Night Mode": { cat: "Listening", desc: "Evens out loud and quiet so nothing startles late at night.", modules: [Cm({ threshold: -32, ratio: 4, attack: 15, release: 200, makeup: 6, detector: "feedback" }), EQm([eb("lowshelf", 90, -2, 0.7), eb("highshelf", 9000, -1.5, 0.7)]), Lm({ ceiling: -1 })] },
+  "Night Mode": { cat: "Listening", desc: "Evens out loud and quiet so nothing startles late at night.", modules: [Cm({ threshold: -32, ratio: 4, attack: 15, release: 200, detector: "feedback", autoMakeup: true }), EQm([eb("lowshelf", 90, -2, 0.7), eb("highshelf", 9000, -1.5, 0.7)]), Lm({ ceiling: -1 })] },
   "Auto Level": { cat: "Listening", desc: "Evens out loudness across videos, ads and songs - quiet stays audible, loud stays in check.", modules: [AGm({ target: -16, speed: 45, range: 14, gate: -45 }), Lm({ ceiling: -1, os: 4 })] },
 
   // ---- Voice & Podcast ----
@@ -301,7 +301,7 @@ const BUILTIN_PRESETS = {
   "Stream Master": { cat: "Calls & Streaming", desc: "Auto-levels to a streaming target with glue + true-peak limit.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 12000, 1.5, 0.7)]), Cm({ threshold: -18, ratio: 2, attack: 30, release: 150, makeup: 2, detector: "feedback" }), AGm({ target: -14, speed: 40, range: 12, gate: -45 }), Lm({ ceiling: -1.5, os: 4 })] },
 
   // ---- Mastering ----
-  "Master Bus": { cat: "Mastering", desc: "Gentle glue compression into a clean limiter.", modules: [EQm([eb("highpass", 28, 0, 0.7), eb("peaking", 200, -1, 1), eb("highshelf", 12000, 1.5, 0.7)]), Cm({ name: "Glue Comp", threshold: -18, ratio: 2, attack: 30, release: 150, makeup: 2, detector: "feedback" }), Lm({ inputGain: 1, ceiling: -0.8, release: 80 }), Am()] },
+  "Master Bus": { cat: "Mastering", desc: "Gentle glue compression into a clean limiter.", modules: [EQm([eb("highpass", 28, 0, 0.7), eb("peaking", 200, -1, 1), eb("highshelf", 12000, 1.5, 0.7)]), Cm({ name: "Glue Comp", threshold: -18, ratio: 2, attack: 30, release: 150, detector: "feedback", autoMakeup: true }), Lm({ inputGain: 1, ceiling: -0.8, release: 80 }), Am()] },
   "Mastering (MB)": { cat: "Mastering", desc: "Multiband control into a true-peak limiter.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 12000, 1.5, 0.7)]), MBm("Multiband", [200, 3000], [mbBand(-22, 2, 30, 200, 2), mbBand(-22, 2, 20, 160, 1.5), mbBand(-22, 2, 12, 120, 1.5)]), Lm({ inputGain: 1, ceiling: -0.8, release: 80, os: 4 }), Am()] },
   "Loud Master": { cat: "Mastering", desc: "Pushed loudness with punch - for energetic music.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("lowshelf", 90, 1.5, 0.7), eb("highshelf", 11000, 2, 0.7)]), MBm("Multiband", [150, 2500], [mbBand(-24, 3, 20, 150, 3), mbBand(-22, 3, 15, 120, 2), mbBand(-20, 3, 8, 90, 2)]), Lm({ inputGain: 3, ceiling: -0.8, style: "punchy", os: 4 })] },
   "Transparent Master": { cat: "Mastering", desc: "Minimal - just a clean true-peak ceiling.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 13000, 1, 0.7)]), Lm({ inputGain: 1, ceiling: -1, style: "transparent", os: 4 })] },
@@ -539,14 +539,14 @@ const BUILTIN_MODULE_PRESETS = {
     "Spectral OTT (3-band)": { bands: [eqd("lowshelf", 140, 0.7, 0, "ott", -30, 6, 12, 180), eqd("peaking", 1200, 1, 0, "ott", -30, 6, 8, 150), eqd("highshelf", 7000, 0.7, 0, "ott", -32, 6, 6, 130)] },
   },
   comp: {
-    "Gentle Glue": { threshold: -20, ratio: 2, attack: 30, release: 200, knee: 8, makeup: 1.5, detector: "feedback", mode: "down" },
-    "Vocal": { threshold: -22, ratio: 4, attack: 6, release: 90, knee: 5, makeup: 3, detector: "feedforward", mode: "down" },
-    "Punch": { threshold: -18, ratio: 4, attack: 25, release: 120, knee: 3, makeup: 2, detector: "feedforward", mode: "down" },
-    "Smash": { threshold: -28, ratio: 10, attack: 1, release: 60, knee: 2, makeup: 5, detector: "feedforward", mode: "down" },
+    "Gentle Glue": { threshold: -20, ratio: 2, attack: 30, release: 200, knee: 8, makeup: 1.5, detector: "feedback", mode: "down", autoMakeup: true },
+    "Vocal": { threshold: -22, ratio: 4, attack: 6, release: 90, knee: 5, makeup: 3, detector: "feedforward", mode: "down", autoMakeup: true },
+    "Punch": { threshold: -18, ratio: 4, attack: 25, release: 120, knee: 3, makeup: 2, detector: "feedforward", mode: "down", autoMakeup: true },
+    "Smash": { threshold: -28, ratio: 10, attack: 1, release: 60, knee: 2, makeup: 5, detector: "feedforward", mode: "down", autoMakeup: true },
     "Upward Lift": { threshold: -30, ratio: 2.5, attack: 20, release: 220, knee: 8, makeup: 0, detector: "feedforward", mode: "up", range: 12 },
     "OTT": { threshold: -28, ratio: 4, ratioUp: 4, attack: 8, release: 100, knee: 6, makeup: 3, detector: "feedforward", mode: "ott", range: 24, mix: 100 },
     "OTT (gentle)": { threshold: -24, ratio: 3, ratioUp: 3, attack: 16, release: 150, knee: 6, makeup: 2, detector: "feedforward", mode: "ott", range: 18, mix: 100 },
-    "Bus Glue": { threshold: -16, ratio: 2, attack: 30, release: 250, knee: 8, makeup: 1.5, detector: "feedback", mode: "down", range: 24, mix: 100 },
+    "Bus Glue": { threshold: -16, ratio: 2, attack: 30, release: 250, knee: 8, makeup: 1.5, detector: "feedback", mode: "down", range: 24, mix: 100, autoMakeup: true },
     "Parallel Squeeze": { threshold: -32, ratio: 8, attack: 2, release: 80, knee: 4, makeup: 4, detector: "feedforward", mode: "down", range: 24, mix: 40 },
   },
   limiter: {
@@ -1254,7 +1254,7 @@ function renderEQ(m) {
 
 // ===================== Compressor =====================
 function renderComp(m) {
-  m.mode = m.mode || "down"; m.range = m.range ?? 24; m.mix = m.mix ?? 100; m.ratioUp = m.ratioUp ?? m.ratio; m.scHpf = m.scHpf ?? 20;
+  m.mode = m.mode || "down"; m.range = m.range ?? 24; m.mix = m.mix ?? 100; m.ratioUp = m.ratioUp ?? m.ratio; m.scHpf = m.scHpf ?? 20; m.autoMakeup = m.autoMakeup ?? false;
   // OTT exposes independent down/up ratios; "Range" becomes the upward depth limit
   const isOtt = m.mode === "ott", upMode = isOtt || m.mode === "up";
   const cKnobs = [
@@ -1284,7 +1284,8 @@ function renderComp(m) {
           <option value="feedforward" ${m.detector === "feedforward" ? "selected" : ""}>Feed-forward</option>
           <option value="feedback" ${m.detector === "feedback" ? "selected" : ""}>Feed-back</option>
         </select>
-      </label>`)}
+      </label>
+      <button id="cAutoMk" class="ed-toggle ${m.autoMakeup ? "on" : ""}" title="Automatically match the output loudness to the input, so toggling/bypassing isn't just 'louder vs quieter'. Overrides the manual Makeup knob.">Auto makeup</button>`)}
     <div class="dyn">
       <div class="graphwrap" title="Transfer curve: input level (x) maps to output level (y). The dot rides the curve at the live level; hover anywhere for a readout. Top strip = gain change over time."><canvas id="compCanvas"></canvas></div>
       <div>
@@ -1332,6 +1333,10 @@ function renderComp(m) {
   updateDetFlow();
   document.getElementById("det").addEventListener("change", (e) => { m.detector = e.target.value; pushParam(m); save(); updateDetFlow(); });
   document.getElementById("cmode").addEventListener("change", (e) => { m.mode = e.target.value; pushParam(m); save(); renderEditor(); }); // full re-render so the preset bar + reset stay wired
+  const mkKnob = () => { const k = document.getElementById("k_makeup"); if (!k) return; k.disabled = !!m.autoMakeup; const kn = k.closest(".knob"); if (kn) { kn.classList.toggle("knob-off", !!m.autoMakeup); kn.title = m.autoMakeup ? "Auto makeup is on - the manual Makeup knob is bypassed." : ""; } };
+  const amBtn = document.getElementById("cAutoMk");
+  amBtn.addEventListener("click", () => { m.autoMakeup = !m.autoMakeup; amBtn.classList.toggle("on", m.autoMakeup); pushParam(m); save(); mkKnob(); });
+  mkKnob();
 
   const canvas = document.getElementById("compCanvas");
   const dims = makeCanvas(canvas, 1);
@@ -1369,7 +1374,8 @@ function renderComp(m) {
     // dry/wet folds the wet gain toward unity: effective dB for a wet gain of gdb.
     const mixF = (m.mix ?? 100) * 0.01;
     const effDb = (gdb) => 20 * Math.log10(Math.max(1e-6, (1 - mixF) + mixF * Math.pow(10, gdb / 20)));
-    const curveOut = (inDb) => inDb + effDb(DSP.dynGain(inDb, m.mode, m.threshold, m.ratio, m.knee, m.range, m.ratioUp) + m.makeup);
+    const mk = m.autoMakeup ? 0 : m.makeup; // auto-makeup is a dynamic level-match, not part of the static curve
+    const curveOut = (inDb) => inDb + effDb(DSP.dynGain(inDb, m.mode, m.threshold, m.ratio, m.knee, m.range, m.ratioUp) + mk);
     const meter = (engine.meters && engine.meters[m.id]) || {};
     const lastGain = meter.gr || 0, egDb = effDb(lastGain), red = Math.max(0, -egDb), boost = Math.max(0, egDb), level = meter.level; // effective cut / boost
 
@@ -1379,7 +1385,7 @@ function renderComp(m) {
         const l = pr[0], g = pr[1]; // g = raw wet signed gain (dB): <0 cut, >0 boost
         trail.push([l, g]); grHist.push(effDb(g)); // signed effective gain (+boost / -cut)
         if (l > -60) inHist[clamp(Math.floor(map(l) * 120), 0, 119)] += 1;
-        const ob = clamp(Math.floor(map(clamp(l + effDb(g + m.makeup), -60, 0)) * 120), 0, 119);
+        const ob = clamp(Math.floor(map(clamp(l + effDb(g + mk), -60, 0)) * 120), 0, 119);
         outHist[ob] += 1; outGR[ob] += g; // track the gain that produced each output level
       }
     }

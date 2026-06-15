@@ -193,6 +193,7 @@ body {
 .ed-toggle:hover { border-color: var(--accent); color: var(--text); }
 .ed-toggle.on { border-color: var(--accent); color: var(--accent); background: #14202e; }
 .ed-toggle:disabled { opacity: .6; cursor: default; }
+.knob.knob-off { opacity: .45; } /* a knob bypassed by an auto mode */
 .empty { color: var(--muted); margin-top: 60px; text-align: center; }
 .onboard { display: flex; justify-content: center; padding-top: 52px; }
 .onboard-card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 26px 30px; max-width: 480px; box-shadow: var(--nm-out-sm); }

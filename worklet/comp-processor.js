@@ -41,6 +41,8 @@ class CompProcessor extends AudioWorkletProcessor {
     this.fbLevel = 0;     // last gain-element output peak (linear), for feedback
     this.fbMono = 0;      // last gain-element output (mono, signed) for filtered feedback detection
     this.scSt = [0, 0, 0, 0]; // side-chain HPF state
+    this.autoMakeup = false;  // adaptive makeup: match output loudness to input (ignores the makeup knob)
+    this.makeupG = 1; this.aMk = 1 - Math.exp(-128 / (0.4 * sampleRate)); // ~400 ms makeup smoothing
     this.batch = [];      // [level,gain, ...] one pair per render quantum
 
     this.recalc();
@@ -58,6 +60,7 @@ class CompProcessor extends AudioWorkletProcessor {
       if (typeof d.ratioUp === "number") this.ratioUp = d.ratioUp;
       if (typeof d.mix === "number") this.mix = d.mix;
       if (typeof d.scHpf === "number") this.scHpf = d.scHpf;
+      if (typeof d.autoMakeup === "boolean") this.autoMakeup = d.autoMakeup;
       this.recalc();
     };
   }
@@ -88,6 +91,7 @@ class CompProcessor extends AudioWorkletProcessor {
     const feedback = this.detector === "feedback";
 
     let qLevel = -100, qGain = 0; // this quantum's peak input level + most-extreme gain
+    let inSq = 0, outSq = 0;      // for adaptive auto-makeup level match
     const mixF = this.mix * 0.01; // 0 = dry, 1 = full wet
 
     for (let i = 0; i < n; i++) {
@@ -113,11 +117,15 @@ class CompProcessor extends AudioWorkletProcessor {
       this.envGain = targetGain + (this.envGain - targetGain) * coeff;
 
       const g = Math.pow(10, this.envGain / 20); // gain-element gain (pre-makeup)
-      const eff = (1 - mixF) + mixF * g * this.makeupLin; // dry/wet as one phase-coherent gain
+      // auto-makeup ignores the manual makeup knob and level-matches afterwards
+      const eff = (1 - mixF) + mixF * g * (this.autoMakeup ? 1 : this.makeupLin);
       let outPeak = 0;
       for (let ch = 0; ch < chans; ch++) {
-        const pre = input[ch][i] * g; // wet, pre-makeup (for feedback detection)
-        output[ch][i] = input[ch][i] * eff;
+        const x = input[ch][i];
+        const pre = x * g; // wet, pre-makeup (for feedback detection)
+        const o = x * eff;
+        output[ch][i] = o;
+        inSq += x * x; outSq += o * o;
         const a = Math.abs(pre);
         if (a > outPeak) outPeak = a;
       }
@@ -128,6 +136,14 @@ class CompProcessor extends AudioWorkletProcessor {
       if (inDb > qLevel) qLevel = inDb;
       if (Math.abs(this.envGain) > Math.abs(qGain)) qGain = this.envGain;
     }
+
+    // adaptive auto-makeup: smoothly match output loudness to input (±~18/-12 dB)
+    if (this.autoMakeup) {
+      const target = Math.min(8, Math.max(0.25, Math.sqrt(inSq / (outSq + 1e-12))));
+      this.makeupG += (target - this.makeupG) * this.aMk;
+      const mg = this.makeupG;
+      for (let ch = 0; ch < chans; ch++) { const o = output[ch]; for (let i = 0; i < n; i++) o[i] *= mg; }
+    } else this.makeupG = 1;
 
     // one (level, signed-gain) sample per quantum, sent in small bursts
     this.batch.push(qLevel, qGain);
