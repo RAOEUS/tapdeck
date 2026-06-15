@@ -190,7 +190,11 @@ class EQProcessor extends AudioWorkletProcessor {
     this.frames += n;
     if (this.frames >= 256) {
       this.frames = 0;
-      if (anyDyn) this.port.postMessage({ type: "meter", mb: this.bands.map((b) => b.dynMode !== "off" ? b.dynDb : 0) });
+      if (anyDyn) { // key by band id, not index — the UI band list includes disabled bands this filtered list drops
+        const mb = {};
+        for (const b of this.bands) if (b.dynMode !== "off") mb[b.id] = b.dynDb;
+        this.port.postMessage({ type: "meter", mb });
+      }
     }
 
     for (let bi = 0; bi < this.bands.length; bi++) {

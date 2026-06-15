@@ -30,6 +30,22 @@ test("EQ solo of a boosting band is audible", () => {
   assert.ok(rms(blocks, 0, 40) > 1e-2, "a boosting band should pass its contribution");
 });
 
+test("EQ dynamic-gain meter is keyed by band id (survives a disabled earlier band)", () => {
+  const { Processor } = loadWorklet("eq-processor.js");
+  const p = new Processor();
+  const msgs = [];
+  p.port.postMessage = (m) => msgs.push(m);
+  // first band disabled (dropped from the worklet's filtered list), second is dynamic
+  send(p, bands(
+    { id: "b1", type: "peaking", freq: 500, gain: 3, q: 1, enabled: false },
+    { id: "b2", type: "peaking", freq: 3000, gain: 0, q: 2, enabled: true, dynMode: "down", dynThr: -50, dynRange: 12, dynAtk: 1, dynRel: 80 },
+  ));
+  render(p, (t) => 0.5 * Math.sin((2 * Math.PI * 3000 * t) / SR), { blocks: 120 });
+  const mb = msgs.filter((x) => x && x.mb).pop().mb;
+  assert.ok(mb && typeof mb === "object" && !Array.isArray(mb), "mb should be an id-keyed object");
+  assert.ok("b2" in mb, "the dynamic band must be reported under its id, not a filtered index");
+});
+
 test("EQ peaking boost raises the level at its frequency", () => {
   const { Processor } = loadWorklet("eq-processor.js");
   const p = new Processor();

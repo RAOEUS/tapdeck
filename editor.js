@@ -970,8 +970,8 @@ function renderEQ(m) {
 
     const sr = engine.sampleRate || 48000;
     const meter = (engine.meters && engine.meters[m.id]) || {};
-    const mb = engine.running ? (meter.mb || []) : [];
-    const dynOf = (i) => (m.bands[i].dynMode && m.bands[i].dynMode !== "off") ? (mb[i] || 0) : 0;
+    const mb = engine.running ? (meter.mb || {}) : {}; // keyed by band id (survives disabled bands)
+    const dynOf = (i) => { const b = m.bands[i]; return (b.dynMode && b.dynMode !== "off") ? (mb[b.id] || 0) : 0; };
     const mixF = (m.mix ?? 100) * 0.01; // dry/wet scales bell/shelf gains
     // dynamic-EQ regions: a filled bell per dynamic band showing the WIDTH (Q) and
     // depth of its move, coloured by direction (red = cut, green = boost; OTT = both).
