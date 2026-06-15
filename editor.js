@@ -189,8 +189,9 @@ const Dm = (o) => ({ type: "denoise", name: "Denoise", amount: 60, floor: 6, ...
 const Tm = (o) => ({ type: "trans", name: "Transient", attack: 0, sustain: 0, output: 0, ...o });
 const Um = (o) => ({ type: "utility", name: "Utility", gain: 0, pan: 0, width: 1, mono: false, invL: false, invR: false, swap: false, crossfeed: 0, ...o });
 const Am = () => ({ type: "analyzer", name: "Analyzer" });
+const AGm = (o) => ({ type: "autogain", name: "Auto Gain", target: -16, speed: 50, range: 12, gate: -45, ...o });
 
-const PRESET_CATS = ["Listening", "Voice & Podcast", "Calls & Streaming", "Mastering", "Creative / FX"];
+const PRESET_CATS = ["Listening", "Genre EQ", "Movies & Games", "Voice & Podcast", "Calls & Streaming", "Mastering", "Creative / FX"];
 const BUILTIN_PRESETS = {
   // ---- Listening ----
   "Flat (reference)": { cat: "Listening", desc: "Unprocessed — a clean reference with the analyzer.", modules: [EQm([eb("peaking", 100, 0, 1), eb("peaking", 1000, 0, 1), eb("peaking", 8000, 0, 1)]), Am()] },
@@ -225,6 +226,21 @@ const BUILTIN_PRESETS = {
   "Saturated Drive": { cat: "Creative / FX", desc: "Heavy harmonic drive with output trim.", modules: [Sm({ drive: 14, mode: "tape", output: -3, os: 4 }), EQm([eb("lowshelf", 100, 1, 0.7), eb("highshelf", 10000, -1, 0.7)])] },
   "Wide & Big": { cat: "Creative / FX", desc: "Wider stereo image with a fuller tone.", modules: [Um({ width: 1.4 }), EQm([eb("lowshelf", 100, 1.5, 0.7), eb("highshelf", 10000, 2, 0.7)]), Cm({ threshold: -20, ratio: 2, attack: 20, release: 150, makeup: 1 })] },
   "Mono Check": { cat: "Creative / FX", desc: "Sum to mono to check mono compatibility and phase.", modules: [Um({ mono: true })] },
+
+  // ---- Genre EQ (EQ-only voicings) ----
+  "Rock": { cat: "Genre EQ", desc: "Punchy lows, present mids, crisp top.", modules: [EQm([eb("lowshelf", 90, 3, 0.7), eb("peaking", 500, -2, 1), eb("peaking", 3000, 2.5, 1.1), eb("highshelf", 9000, 2.5, 0.7)])] },
+  "EDM / Bass": { cat: "Genre EQ", desc: "Big sub & lows with sparkly highs.", modules: [EQm([eb("lowshelf", 70, 6, 0.7), eb("peaking", 400, -2, 1), eb("highshelf", 10000, 4, 0.7)])] },
+  "Hip-Hop": { cat: "Genre EQ", desc: "Deep bass, smooth mids, clear vocals.", modules: [EQm([eb("lowshelf", 80, 5, 0.7), eb("peaking", 300, -2, 1), eb("peaking", 2500, 2, 1.1), eb("highshelf", 11000, 2, 0.7)])] },
+  "Classical": { cat: "Genre EQ", desc: "Natural and open — gentle air, rumble cut.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("peaking", 250, -1, 0.8), eb("highshelf", 12000, 2, 0.7)])] },
+  "Jazz": { cat: "Genre EQ", desc: "Warm mids, smooth and relaxed.", modules: [EQm([eb("lowshelf", 120, 2, 0.7), eb("peaking", 800, 1, 1), eb("highshelf", 9000, 1.5, 0.7)])] },
+  "Acoustic": { cat: "Genre EQ", desc: "Intimate body with clear, airy detail.", modules: [EQm([eb("highpass", 60, 0, 0.7), eb("peaking", 200, -1.5, 1), eb("peaking", 4000, 2, 1.1), eb("highshelf", 11000, 3, 0.7)])] },
+  "Vocal Boost": { cat: "Genre EQ", desc: "Pushes voices forward in any mix.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 350, -2.5, 1.1), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)])] },
+
+  // ---- Movies & Games ----
+  "Movie / TV Night": { cat: "Movies & Games", desc: "Tames explosions, lifts dialogue, and evens the level for late-night viewing.", modules: [EQm([eb("highpass", 45, 0, 0.7), eb("peaking", 300, -2, 1), eb("peaking", 2500, 3, 1.1), eb("highshelf", 9000, 1.5, 0.7)]), Cm({ threshold: -28, ratio: 3, attack: 20, release: 200, knee: 8, makeup: 4, detector: "feedback", scHpf: 80 }), Lm({ ceiling: -1, os: 4 })] },
+  "Dialogue Clarity": { cat: "Movies & Games", desc: "Maximum speech intelligibility — presence boost + leveling.", modules: [EQm([eb("highpass", 100, 0, 0.7), eb("peaking", 400, -3, 1.2), eb("peaking", 3000, 5, 1.3), eb("highshelf", 8000, 2, 0.7)]), AGm({ target: -15, speed: 70, range: 15, gate: -42 }), Lm({ ceiling: -1 })] },
+  "Gaming": { cat: "Movies & Games", desc: "Brings up footsteps, cues and dialogue; tightens the lows.", modules: [EQm([eb("highpass", 60, 0, 0.7), eb("peaking", 250, -2, 1), eb("peaking", 4500, 4, 1.2), eb("highshelf", 8000, 3, 0.7)]), Cm({ threshold: -24, ratio: 3, attack: 10, release: 120, makeup: 3 })] },
+  "Laptop Speakers": { cat: "Movies & Games", desc: "Adds body and tames harshness on small built-in speakers.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 180, 3, 0.9), eb("peaking", 3000, -3, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -22, ratio: 3, attack: 12, release: 140, makeup: 2 })] },
 };
 
 // transient non-blocking confirmation pill (bottom-center, fades after ~1.4s)
@@ -392,6 +408,11 @@ const BUILTIN_MODULE_PRESETS = {
     "Air Lift": { bands: [eb("highshelf", 10000, 4, 0.7), eb("peaking", 3000, 1.5, 1)] },
     "Low Cut": { bands: [eb("highpass", 90, 0, 0.7)] },
     "Telephone": { bands: [eb("highpass", 400, 0, 0.7), eb("lowpass", 3000, 0, 0.7), eb("peaking", 1500, 4, 1)] },
+    "Rock": { bands: [eb("lowshelf", 90, 3, 0.7), eb("peaking", 500, -2, 1), eb("peaking", 3000, 2.5, 1.1), eb("highshelf", 9000, 2.5, 0.7)] },
+    "EDM / Bass": { bands: [eb("lowshelf", 70, 6, 0.7), eb("peaking", 400, -2, 1), eb("highshelf", 10000, 4, 0.7)] },
+    "Hip-Hop": { bands: [eb("lowshelf", 80, 5, 0.7), eb("peaking", 300, -2, 1), eb("peaking", 2500, 2, 1.1), eb("highshelf", 11000, 2, 0.7)] },
+    "Classical": { bands: [eb("highpass", 30, 0, 0.7), eb("peaking", 250, -1, 0.8), eb("highshelf", 12000, 2, 0.7)] },
+    "Vocal Boost": { bands: [eb("highpass", 90, 0, 0.7), eb("peaking", 350, -2.5, 1.1), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)] },
     // dynamic-EQ presets (per-band compression): gain 0, duck/lift only when triggered
     "De-Esser (soft)": { bands: [eqd("peaking", 7000, 5, 0, "down", -32, 6, 2, 70)] },
     "De-Esser (hard)": { bands: [eqd("peaking", 6500, 6.5, 0, "down", -34, 12, 1, 60)] },
