@@ -375,6 +375,29 @@ function duplicateModule(id) {
   commit();
   toast(`Duplicated ${clone.name}`);
 }
+// inline-rename a module by editing `el` in place (rack-list name or editor title)
+function startRename(el, m) {
+  const li = el.closest(".module-item"); if (li) li.draggable = false;
+  const prev = m.name;
+  el.contentEditable = "plaintext-only";
+  el.classList.add("renaming");
+  el.textContent = m.name;
+  const range = document.createRange(); range.selectNodeContents(el);
+  const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+  el.focus();
+  let done = false;
+  const finish = (keep) => {
+    if (done) return; done = true;
+    el.removeEventListener("keydown", onKey); el.removeEventListener("blur", onBlur);
+    const v = el.textContent.replace(/\s+/g, " ").trim();
+    m.name = (keep && v) ? v.slice(0, 40) : prev;
+    commit({ structure: false }); // re-renders with the new name; no DSP resync needed
+  };
+  const onKey = (e) => { if (e.key === "Enter") { e.preventDefault(); finish(true); } else if (e.key === "Escape") { e.preventDefault(); finish(false); } };
+  const onBlur = () => finish(true);
+  el.addEventListener("keydown", onKey);
+  el.addEventListener("blur", onBlur);
+}
 let moduleClipboard = null; // JSON of a copied module (paste clones it, even across tabs)
 function copyModule(id) {
   const r = rack(); const m = r && r.modules.find((x) => x.id === id);
@@ -677,18 +700,20 @@ function renderRack() {
     li.innerHTML = `
       <span class="grip" title="Drag to reorder">⠿</span>
       ${canBypass ? `<button class="pwr ${m.bypass ? "" : "on"}" title="Bypass">${m.bypass ? "○" : "●"}</button>` : `<span class="pwr ghost">◍</span>`}
-      <span class="name">${m.name}</span>
+      <span class="name" title="${escapeHtml(m.name)} — double-click to rename">${escapeHtml(m.name)}</span>
       <span class="tag">${TAGS[m.type] || m.type}</span>
       <button class="dup" title="Duplicate">⧉</button>
       <button class="del" title="Remove">✕</button>`;
 
     li.addEventListener("click", (e) => {
-      if (e.target.closest("button")) return;
+      if (e.target.closest("button") || e.target.isContentEditable) return;
       r.selected = m.id; commit({ structure: false });
     });
     if (canBypass) li.querySelector(".pwr").addEventListener("click", () => { m.bypass = !m.bypass; commit(); });
     li.querySelector(".dup").addEventListener("click", () => duplicateModule(m.id));
     li.querySelector(".del").addEventListener("click", () => removeModule(m.id));
+    const nameEl = li.querySelector(".name");
+    nameEl.addEventListener("dblclick", (e) => { e.stopPropagation(); startRename(nameEl, m); });
 
     // drag and drop
     li.addEventListener("dragstart", (e) => { dragId = m.id; e.dataTransfer.effectAllowed = "move"; li.classList.add("dragging"); });
@@ -812,6 +837,8 @@ function renderEditor() {
   else renderAnalyzer(m);
   const rb = document.getElementById("resetMod");
   if (rb) rb.onclick = () => resetModule(m);
+  const tt = document.getElementById("edTitle");
+  if (tt) tt.addEventListener("dblclick", () => startRename(tt, m));
   injectModulePresetBar(m);
 }
 
@@ -854,7 +881,7 @@ function makeCanvas(canvas, aspect, onResize) {
 // group (module selects/toggles) always ending in Reset. `controls` is optional
 // HTML for the module's own selects/toggles.
 function edHead(title, tag, controls) {
-  return `<div class="ed-head"><h1>${escapeHtml(title)}</h1><span class="tag">${tag}</span>` +
+  return `<div class="ed-head"><h1 id="edTitle" title="${escapeHtml(title)} — double-click to rename">${escapeHtml(title)}</h1><span class="tag">${tag}</span>` +
     `<div class="ed-controls">${controls || ""}<button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div></div>`;
 }
 
