@@ -38,6 +38,7 @@ class AutoGainProcessor extends AudioWorkletProcessor {
     [this.kw1, this.kw2] = kWeightCoeffs(sampleRate);
     this.kSt = [[[0, 0, 0, 0], [0, 0, 0, 0]], [[0, 0, 0, 0], [0, 0, 0, 0]]];
     this.frames = 0; this.trace = [];
+    this.anLeft = 0; this.aid = 0; this.anSum = 0; this.anCount = 0; // integrated-loudness measure
     this.recalc();
     this.port.onmessage = (e) => {
       const d = e.data || {};
@@ -45,6 +46,7 @@ class AutoGainProcessor extends AudioWorkletProcessor {
       if (typeof d.speed === "number") this.speed = d.speed;
       if (typeof d.range === "number") this.range = d.range;
       if (typeof d.gate === "number") this.gate = d.gate;
+      if (typeof d.analyze === "number") { this.anLeft = Math.round(d.analyze * sampleRate); this.anSum = 0; this.anCount = 0; }
       this.recalc();
     };
   }
@@ -73,6 +75,7 @@ class AutoGainProcessor extends AudioWorkletProcessor {
       }
       this.kPow += (kp - this.kPow) * (kp > this.kPow ? this.aAtk : this.aRel);
       lufs = -0.691 + 10 * Math.log10(this.kPow + 1e-12);
+      if (this.anLeft > 0 && lufs > -60) { this.anSum += kp; this.anCount++; } // gated integrated-loudness accumulation
 
       // desired gain toward the target, gated + range-limited; hold below the gate
       let desired = this.gainDb;
@@ -93,6 +96,16 @@ class AutoGainProcessor extends AudioWorkletProcessor {
       this.frames = 0;
       this.trace.push(lufs, this.gainDb);
       if (this.trace.length >= 16) { this.port.postMessage({ type: "meter", s: this.trace }); this.trace = []; }
+    }
+
+    if (this.anLeft > 0) { // finish a loudness measurement when its window elapses
+      this.anLeft -= n;
+      if (this.anLeft <= 0) {
+        this.aid++;
+        const il = this.anCount > 0 ? -0.691 + 10 * Math.log10(this.anSum / this.anCount + 1e-12) : -120;
+        this.port.postMessage({ type: "meter", analysis: { lufs: il, aid: this.aid, n: this.anCount } });
+        this.anSum = 0; this.anCount = 0;
+      }
     }
     return true;
   }

@@ -115,6 +115,18 @@ body {
 .hp-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hp-db { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; flex: none; }
 
+/* Auto-Gain setup form */
+.form-step { font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin: 14px 2px 8px; }
+.form-step:first-child { margin-top: 2px; }
+.ag-targets { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.ag-target { display: flex; flex-direction: column; gap: 2px; text-align: left; background: linear-gradient(var(--panel2), #191e26); border: 1px solid #232a34; border-radius: 10px; padding: 11px 13px; cursor: pointer; color: var(--text); font: inherit; }
+.ag-target:hover { border-color: #38414f; }
+.ag-target.on { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(54,163,255,.25) inset; }
+.ag-target b { font-size: 13px; font-weight: 600; }
+.ag-target span { font-size: 12px; color: var(--accent); font-variant-numeric: tabular-nums; }
+.ag-target small { font-size: 10px; color: var(--muted); }
+.ag-link { background: none; border: 0; color: var(--accent); cursor: pointer; font: inherit; font-size: 12px; font-weight: 600; padding: 0 0 0 4px; text-decoration: underline; }
+
 #moduleList { list-style: none; margin: 0; padding: 8px; flex: 1; overflow-y: auto; }
 .module-item {
   display: flex; align-items: center; gap: 7px; padding: 9px 10px; margin: 5px 0;

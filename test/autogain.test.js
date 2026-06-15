@@ -25,6 +25,23 @@ test("auto-gain attenuates loud content toward the target", () => {
   assert.ok(rms(blocks, 0, 900) < loud / Math.SQRT2, "loud input should be pulled down");
 });
 
+test("auto-gain measures program loudness (louder reads higher)", () => {
+  const measure = (amp, sec = 0.4) => {
+    const { Processor } = loadWorklet("autogain-processor.js");
+    const p = new Processor();
+    const msgs = [];
+    p.port.postMessage = (m) => msgs.push(m);
+    send(p, { analyze: sec });
+    render(p, tone(amp, 1000), { blocks: Math.ceil((sec * SR) / 128) + 10 });
+    const a = msgs.filter((x) => x && x.analysis).pop();
+    return a ? a.analysis : null;
+  };
+  const loud = measure(0.5), quiet = measure(0.05);
+  assert.ok(loud && quiet && loud.n > 50 && quiet.n > 50, "should accumulate samples");
+  assert.ok(loud.lufs > quiet.lufs + 5, `louder content should read higher LUFS: ${loud.lufs.toFixed(1)} vs ${quiet.lufs.toFixed(1)}`);
+  assert.ok(loud.lufs < 0 && loud.lufs > -40, `plausible LUFS, got ${loud.lufs.toFixed(1)}`);
+});
+
 test("auto-gain holds (doesn't boost) below the gate", () => {
   const { Processor } = loadWorklet("autogain-processor.js");
   const p = new Processor();

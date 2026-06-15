@@ -793,7 +793,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") setAddMenu
 
 document.getElementById("presetBrowse").addEventListener("click", openPresetBrowser);
 document.getElementById("presetSave").addEventListener("click", savePreset);
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closePresetBrowser(); closeHpBrowser(); } });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closePresetBrowser(); closeHpBrowser(); closeAgForm(); } });
 
 // ---------- editor panel ----------
 const edEl = document.getElementById("moduleEditor");
@@ -2299,10 +2299,67 @@ function renderDereverb(m) {
 }
 
 // ===================== Auto Gain (loudness leveler) =====================
+// Auto-Gain setup form: pick a standard target + measure the program loudness.
+let agModalEl = null;
+const agAnAid = {}; // module id -> last applied measurement id
+function closeAgForm() { if (agModalEl) { agModalEl.remove(); agModalEl = null; } }
+function setAgTarget(m, v) { const inp = document.getElementById("k_target"); if (inp) { inp.value = v; inp.dispatchEvent(new Event("input")); } if (agModalEl) markAgTargets(m); }
+function markAgTargets(m) { if (agModalEl) agModalEl.querySelectorAll(".ag-target").forEach((b) => b.classList.toggle("on", Math.abs(parseFloat(b.dataset.t) - m.target) < 0.01)); }
+function showAgMeasured(m, an) {
+  if (!agModalEl) return;
+  const out = agModalEl.querySelector("#agMeasured"), meas = agModalEl.querySelector("#agMeasure");
+  if (meas) { meas.disabled = false; meas.textContent = "▶ Measure (5s)"; }
+  if (!out) return;
+  if (an.n > 50 && an.lufs > -120) {
+    const diff = an.lufs - m.target;
+    const rel = Math.abs(diff) < 0.5 ? "right at" : diff > 0 ? `${diff.toFixed(1)} dB over` : `${(-diff).toFixed(1)} dB under`;
+    out.innerHTML = `Program loudness <b>${an.lufs.toFixed(1)} LUFS</b> - ${rel} your ${m.target} target. <button class="ag-link" id="agMatch">Match content (${Math.round(an.lufs)})</button>`;
+    const mb = agModalEl.querySelector("#agMatch");
+    if (mb) mb.addEventListener("click", () => setAgTarget(m, Math.round(an.lufs)));
+  } else out.textContent = "Couldn't measure - is audio playing?";
+}
+function openAgForm(m) {
+  closeAgForm();
+  const T = [["-14", "Streaming", "Spotify · YouTube · Apple Music"], ["-16", "Podcast / Voice", "spoken-word standard"], ["-23", "Broadcast", "EBU R128 / TV"], ["-12", "Loud", "punchy, club-style"]];
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay";
+  ov.innerHTML = `
+    <div class="modal" style="width:min(560px,100%)">
+      <div class="modal-head"><h2>Auto-Gain setup</h2><button class="modal-x" title="Close">✕</button></div>
+      <div class="modal-body">
+        <div class="form-step">1 &middot; Target loudness</div>
+        <div class="ag-targets">${T.map(([v, l, d]) => `<button class="ag-target" data-t="${v}"><b>${l}</b><span>${v} LUFS</span><small>${d}</small></button>`).join("")}</div>
+        <div class="form-step">2 &middot; Measure your content</div>
+        <p class="hint" style="font-style:normal; margin:0 0 10px">Play a representative few seconds, then measure the program loudness to pick a target relative to it.</p>
+        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+          <button id="agMeasure" class="ed-toggle">▶ Measure (5s)</button>
+          <span id="agMeasured" class="hint" style="font-style:normal">Not measured yet.</span>
+        </div>
+      </div>
+      <div class="modal-foot"><button id="agDone" class="primary">Done</button><span class="modal-hint">Target also lives on the knob - this is a quick chooser.</span></div>
+    </div>`;
+  document.body.appendChild(ov);
+  agModalEl = ov;
+  ov.querySelectorAll(".ag-target").forEach((b) => b.addEventListener("click", () => setAgTarget(m, parseFloat(b.dataset.t))));
+  markAgTargets(m);
+  ov.querySelector(".modal-x").addEventListener("click", closeAgForm);
+  ov.querySelector("#agDone").addEventListener("click", closeAgForm);
+  ov.addEventListener("mousedown", (e) => { if (e.target === ov) closeAgForm(); });
+  const meas = ov.querySelector("#agMeasure"), out = ov.querySelector("#agMeasured");
+  meas.addEventListener("click", () => {
+    if (selectedTab == null) { out.textContent = "Capture a tab first."; return; }
+    send({ type: "set-param", tabId: selectedTab, id: m.id, params: { analyze: 5 } });
+    meas.disabled = true; out.textContent = "Listening…";
+    let left = 5; meas.textContent = `Listening ${left}s…`;
+    const iv = setInterval(() => { left--; meas.textContent = left > 0 ? `Listening ${left}s…` : "Measuring…"; if (left <= 0) clearInterval(iv); }, 1000);
+    setTimeout(() => { if (meas.disabled) { meas.disabled = false; meas.textContent = "▶ Measure (5s)"; } }, 6500);
+  });
+}
+
 function renderAutoGain(m) {
   m.target = m.target ?? -16; m.speed = m.speed ?? 50; m.range = m.range ?? 12; m.gate = m.gate ?? -45; m.zoom = m.zoom ?? 8000;
   edEl.innerHTML = `
-    ${edHead(m.name, "Loudness leveler")}
+    ${edHead(m.name, "Loudness leveler", `<button id="agSetup" class="ed-toggle" title="Pick a standard target and measure your content's loudness">⚙ Target &amp; analyze</button>`)}
     <div class="lim-graph" style="display:flex; flex-direction:column; gap:8px">
       <div class="graphwrap" title="Input loudness (blue) vs the leveled output (green) over time, with the target (dashed). The output rides toward the target; the shaded gap is the gain being applied."><canvas id="agCanvas"></canvas></div>
       <label class="hint" style="display:flex; align-items:center; gap:8px">Zoom
@@ -2318,6 +2375,7 @@ function renderAutoGain(m) {
     </div>
     <p class="hint" id="agReadout" style="margin-top:12px; font-style:normal">Listening…</p>`;
   wireKnobs(m, ["target", "speed", "range", "gate"]);
+  document.getElementById("agSetup").addEventListener("click", () => openAgForm(m));
   const tip = (key, t) => { const e = document.getElementById("k_" + key); if (e) e.closest(".knob").title = t; };
   tip("target", "The loudness to aim for (LUFS). Around -16 suits general listening; lower targets are louder. Matches the Limiter's LUFS meter.");
   tip("speed", "How quickly it adapts. Lower = album-style (rides slowly, preserves dynamics); higher = dialog-style (levels fast). Boosting is always slower than cutting.");
@@ -2339,6 +2397,7 @@ function renderAutoGain(m) {
   currentDraw = function () {
     const { W, H, dpr } = dims();
     const me = (engine.meters && engine.meters[m.id]) || {};
+    if (agModalEl && me.analysis && agAnAid[m.id] !== me.analysis.aid) { agAnAid[m.id] = me.analysis.aid; showAgMeasured(m, me.analysis); }
     if (engine.running && me.trace) for (const pr of me.trace) { histL.push(pr[0]); histG.push(pr[1]); }
     if (histL.length > MAXHIST) { const ex = histL.length - MAXHIST; histL.splice(0, ex); histG.splice(0, ex); }
 
