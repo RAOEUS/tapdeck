@@ -48,7 +48,7 @@ class Chan {
     this.warm = 0;
   }
   // process one HOP of input -> one HOP of output; returns mean gain reduction (dB)
-  block(inBlk, outBlk, reduction, floorG) {
+  block(inBlk, outBlk, reduction, floorG, wet) {
     const { inHist, ola, re, im, win, fftp, psm, pmin, gainSm } = this;
     inHist.copyWithin(0, HOP);          // slide history left by one hop
     inHist.set(inBlk, N - HOP);         // append newest hop
@@ -65,6 +65,7 @@ class Chan {
       const snr = Math.max(psm[k] / (noiseP + 1e-12) - 1, 0);            // a-priori SNR estimate
       let g = snr / (snr + reduction);                                   // Wiener-style gain
       if (g < floorG) g = floorG;
+      g = 1 + (g - 1) * wet;                                             // Amount as wet/dry: 0% = fully transparent
       gainSm[k] += (g - gainSm[k]) * 0.6;                                // temporal smoothing -> less musical noise
       g = gainSm[k];
       grAccum += g;
@@ -102,9 +103,10 @@ class DenoiseProcessor extends AudioWorkletProcessor {
     const n = input[0].length, chans = Math.min(2, input.length);
     const reduction = 0.3 + (this.amount / 100) * 3;   // Wiener aggressiveness
     const floorG = Math.max(0.0, this.floor / 100);     // residual floor (0..1)
+    const wet = Math.max(0, Math.min(1, this.amount / 100)); // 0% Amount = bypass (transparent)
     for (let i = 0; i < n; i += HOP) {
       for (let ch = 0; ch < chans; ch++) {
-        const gr = this.chans[ch].block(input[ch].subarray(i, i + HOP), output[ch].subarray(i, i + HOP), reduction, floorG);
+        const gr = this.chans[ch].block(input[ch].subarray(i, i + HOP), output[ch].subarray(i, i + HOP), reduction, floorG, wet);
         if (ch === 0 && gr > this.meterGR) this.meterGR = gr;
       }
       if (output.length > 1 && chans === 1) output[1].set(output[0].subarray(i, i + HOP), i);
