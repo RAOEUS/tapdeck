@@ -39,7 +39,7 @@ needs a live user gesture that doesn't survive the hop to the worker.
 
 | Module | What it does |
 |---|---|
-| **EQ** | Multi-band parametric (8 shapes), optional per-band **dynamics** (compress/expand/OTT), **Stereo / Mid / Side** processing, and **Solo** (phase-cancel audition of one band). |
+| **EQ** | Multi-band parametric (8 shapes), optional per-band **dynamics** (compress/expand/OTT), **Stereo / Mid / Side** processing, **Solo** (phase-cancel audition of one band), and **one-click AutoEq headphone correction** (searchable library fetched live from the AutoEq repo). |
 | **Compressor** | Down / Up / Expand / OTT modes, soft knee, **feed-forward / feed-back** detection, parallel mix, **sidechain HPF**. |
 | **Multiband** | Linkwitz-Riley split into N bands, a compressor per band, OTT-capable. |
 | **Gate / Expander** | Threshold/ratio/range/attack/release/hold with a live open/closed + level display. |

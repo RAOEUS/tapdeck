@@ -48,6 +48,92 @@ function parseAutoEQ(text) {
   return bands.length ? { bands, preamp } : null;
 }
 
+// ---------- AutoEq headphone browser (fetches from the AutoEq GitHub repo) ----------
+const AUTOEQ_BASE = "https://raw.githubusercontent.com/jaakkopasanen/AutoEq/master/";
+const AUTOEQ_INDEX = AUTOEQ_BASE + "results/INDEX.md";
+// Parse the big INDEX.md into { n: display name, db: source, p: ParametricEQ.txt path }.
+// Each headphone lives in results/<db>/<rig>/<name>/ with a "<name> ParametricEQ.txt".
+function parseHpIndex(md) {
+  const out = [], seen = new Set(), re = /\[([^\]]+)\]\(([^)]+)\)/g;
+  let mt;
+  while ((mt = re.exec(md))) {
+    let path = mt[2].trim().replace(/^\.?\//, "").replace(/^results\//i, "");
+    try { path = decodeURI(path); } catch {} // index links may URL-encode spaces; store the real path
+    const folder = /\.md$/i.test(path) ? path.replace(/\/[^/]+\.md$/i, "") : path.replace(/\/+$/, "");
+    const segs = folder.split("/");
+    if (segs.length < 3) continue; // database / rig / headphone
+    const name = segs[segs.length - 1];
+    const peq = "results/" + folder + "/" + name + " ParametricEQ.txt";
+    if (seen.has(peq)) continue;
+    seen.add(peq);
+    out.push({ n: (mt[1] || name).trim(), db: segs[0], p: peq });
+  }
+  return out;
+}
+async function fetchHpIndex(force) {
+  if (!force) {
+    try { const d = await chrome.storage.local.get("hpIndex"); if (d.hpIndex && d.hpIndex.list && d.hpIndex.list.length) return d.hpIndex.list; } catch {}
+  }
+  const res = await fetch(AUTOEQ_INDEX, { cache: "no-cache" });
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  const list = parseHpIndex(await res.text());
+  if (!list.length) throw new Error("index empty");
+  try { chrome.storage.local.set({ hpIndex: { ts: Date.now(), list } }); } catch {}
+  return list;
+}
+let hpModalEl = null;
+function closeHpBrowser() { if (hpModalEl) { hpModalEl.remove(); hpModalEl = null; } }
+function openHpBrowser(m) {
+  closeHpBrowser();
+  const ov = document.createElement("div");
+  ov.className = "modal-overlay";
+  ov.innerHTML = `
+    <div class="modal" role="dialog" aria-label="Headphone EQ">
+      <div class="modal-head"><h2>Headphone EQ <span class="modal-hint" style="font-weight:400">AutoEq library</span></h2><button class="modal-x" title="Close">✕</button></div>
+      <div style="padding:14px 20px 4px"><input id="hpSearch" type="search" placeholder="Search your headphones… (e.g. HD 650, Sundara, AirPods Pro)" autocomplete="off"></div>
+      <div class="modal-body" id="hpBody"><p class="preset-none">Loading headphone list…</p></div>
+      <div class="modal-foot"><button id="hpRefresh">↻ Refresh list</button><span class="modal-hint">Applies the headphone's correction to this EQ. Fetched on demand from the AutoEq repo — nothing is stored on disk.</span></div>
+    </div>`;
+  document.body.appendChild(ov);
+  hpModalEl = ov;
+  ov.querySelector(".modal-x").addEventListener("click", closeHpBrowser);
+  ov.addEventListener("mousedown", (e) => { if (e.target === ov) closeHpBrowser(); });
+  const body = ov.querySelector("#hpBody"), search = ov.querySelector("#hpSearch");
+  let list = [];
+  const draw = () => {
+    if (!list.length) { body.innerHTML = `<p class="preset-none">List unavailable — try ↻ Refresh.</p>`; return; }
+    const q = search.value.trim().toLowerCase();
+    const all = q ? list.filter((h) => (h.n + " " + h.db).toLowerCase().includes(q)) : list;
+    const shown = all.slice(0, 300);
+    if (!shown.length) { body.innerHTML = `<p class="preset-none">No match for “${escapeHtml(search.value.trim())}”.</p>`; return; }
+    body.innerHTML = `<div class="hp-list">${shown.map((h, i) => `<button class="hp-item" data-i="${i}"><span class="hp-name">${escapeHtml(h.n)}</span><span class="hp-db">${escapeHtml(h.db)}</span></button>`).join("")}</div>${all.length > shown.length ? `<p class="preset-none">Showing ${shown.length} of ${all.length} — keep typing to narrow.</p>` : ""}`;
+    body.querySelectorAll(".hp-item").forEach((el) => el.addEventListener("click", () => applyHp(m, shown[+el.dataset.i])));
+  };
+  search.addEventListener("input", draw);
+  ov.querySelector("#hpRefresh").addEventListener("click", async () => {
+    body.innerHTML = `<p class="preset-none">Refreshing…</p>`;
+    try { list = await fetchHpIndex(true); toast(`Loaded ${list.length} headphones`); draw(); }
+    catch (e) { body.innerHTML = `<p class="preset-none">Couldn't fetch the list (${escapeHtml(String(e.message || e))}).</p>`; }
+  });
+  fetchHpIndex(false).then((l) => { list = l; draw(); search.focus(); })
+    .catch((e) => { body.innerHTML = `<p class="preset-none">Couldn't load the list (${escapeHtml(String(e.message || e))}). Try ↻ Refresh.</p>`; });
+}
+async function applyHp(m, item) {
+  try {
+    const url = AUTOEQ_BASE + encodeURI(item.p).replace(/#/g, "%23").replace(/\?/g, "%3F");
+    const res = await fetch(url, { cache: "no-cache" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const parsed = parseAutoEQ(await res.text());
+    if (!parsed) throw new Error("no parametric filters");
+    pushUndo();
+    m.bands = parsed.bands;
+    if (parsed.preamp != null) m.preamp = parsed.preamp;
+    commit();
+    closeHpBrowser();
+    toast(`Applied ${item.n} · ${parsed.bands.length} bands`);
+  } catch (e) { toast("Couldn't apply: " + (e.message || e)); }
+}
+
 // Perceptual "magma" colormap -> 256-entry RGB LUT. Monotonic luminance means
 // brightness reads directly as intensity (unlike a hue sweep, which reads messy).
 function buildLut(stops) {
@@ -682,7 +768,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") setAddMenu
 
 document.getElementById("presetBrowse").addEventListener("click", openPresetBrowser);
 document.getElementById("presetSave").addEventListener("click", savePreset);
-document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePresetBrowser(); });
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closePresetBrowser(); closeHpBrowser(); } });
 
 // ---------- editor panel ----------
 const edEl = document.getElementById("moduleEditor");
@@ -786,6 +872,7 @@ function renderEQ(m) {
       <label>Preamp <input type="number" id="eqPreamp" value="${(m.preamp || 0).toFixed(1)}" step="0.5" min="-24" max="24" style="width:62px"> dB</label>
       <label title="Dry/Wet: scales every bell/shelf band's gain toward flat - phase-coherent, no comb filtering">Dry/Wet <input type="number" id="eqMix" value="${m.mix ?? 100}" step="1" min="0" max="100" style="width:58px"> %</label>
       <button class="primary" id="addBand">+ Add band</button>
+      <button id="eqHeadphone" title="Search AutoEq for your headphones and apply their correction curve">🎧 Headphone EQ</button>
       <button id="eqImport" title="Import an AutoEQ ParametricEQ.txt file">Import AutoEQ</button>
       <input type="file" id="eqFile" accept=".txt,text/plain" style="display:none">
       <span class="hint">drag = freq/gain · alt-drag/wheel = Q · ctrl+alt-drag = dyn range · dbl-click = add · right-click = menu</span>
@@ -820,6 +907,7 @@ function renderEQ(m) {
   preampEl.addEventListener("input", () => { if (preampEl.value === "") return; m.preamp = clamp(+preampEl.value, -24, 24); pushParam(m); save(); });
   const mixEl = document.getElementById("eqMix");
   mixEl.addEventListener("input", () => { if (mixEl.value === "") return; m.mix = clamp(+mixEl.value, 0, 100); pushParam(m); save(); });
+  document.getElementById("eqHeadphone").addEventListener("click", () => openHpBrowser(m));
   const fileEl = document.getElementById("eqFile");
   document.getElementById("eqImport").addEventListener("click", () => fileEl.click());
   fileEl.addEventListener("change", async (e) => {

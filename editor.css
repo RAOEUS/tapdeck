@@ -102,6 +102,16 @@ body {
 .pc-del:hover { color: var(--danger); background: rgba(229,86,75,.12); }
 .preset-none { color: var(--muted); font-size: 12px; padding: 2px 2px 8px; }
 
+/* headphone (AutoEq) browser */
+#hpSearch { width: 100%; background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font: inherit; font-size: 13px; }
+#hpSearch:focus { outline: none; border-color: var(--accent); }
+.hp-list { display: flex; flex-direction: column; gap: 3px; }
+.hp-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; background: none; border: 0; border-radius: 7px; padding: 9px 11px; cursor: pointer; color: var(--text); font: inherit; }
+.hp-item:hover { background: #14202e; }
+.hp-item:hover .hp-name { color: var(--accent); }
+.hp-name { font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hp-db { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; flex: none; }
+
 #moduleList { list-style: none; margin: 0; padding: 8px; flex: 1; overflow-y: auto; }
 .module-item {
   display: flex; align-items: center; gap: 7px; padding: 9px 10px; margin: 5px 0;
