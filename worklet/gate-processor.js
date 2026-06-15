@@ -2,7 +2,7 @@
 // is attenuated (gently for low ratios, slammed shut for high ones), with a hold
 // time that keeps it open briefly after the level drops.
 // Params: { threshold(dB), ratio, range(dB), attack(ms), release(ms), hold(ms) }.
-// Posts attenuation for the meter: { type:'meter', gr: dB >= 0 }.
+// Posts for the meter: { type:'meter', gr: dB >= 0, level: input peak dBFS }.
 
 class GateProcessor extends AudioWorkletProcessor {
   constructor() {
@@ -11,7 +11,7 @@ class GateProcessor extends AudioWorkletProcessor {
     this.attack = 1; this.release = 120; this.hold = 12;
     this.envGain = 0;       // current gain (dB, <= 0)
     this.holdCount = 0;
-    this.frames = 0; this.meterGR = 0;
+    this.frames = 0; this.meterGR = 0; this.meterLevel = -120;
     this.recalc();
     this.port.onmessage = (e) => {
       const d = e.data || {};
@@ -56,13 +56,14 @@ class GateProcessor extends AudioWorkletProcessor {
       for (let ch = 0; ch < chans; ch++) output[ch][i] = input[ch][i] * g;
       const gr = -this.envGain;
       if (gr > this.meterGR) this.meterGR = gr;
+      if (levelDb > this.meterLevel) this.meterLevel = levelDb; // window-peak input level
     }
 
     this.frames += n;
     if (this.frames >= 256) {
       this.frames = 0;
-      this.port.postMessage({ type: "meter", gr: this.meterGR });
-      this.meterGR *= 0.6;
+      this.port.postMessage({ type: "meter", gr: this.meterGR, level: this.meterLevel });
+      this.meterGR *= 0.6; this.meterLevel = -120;
     }
     return true;
   }
