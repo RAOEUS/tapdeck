@@ -104,6 +104,7 @@ function defaultModule(type) {
   if (type === "trans") return { ...base, name: "Transient", attack: 0, sustain: 0, output: 0 };
   if (type === "gate") return { ...base, name: "Gate", threshold: -45, ratio: 4, range: 50, attack: 1, release: 120, hold: 12 };
   if (type === "denoise") return { ...base, name: "Denoise", amount: 60, floor: 6 };
+  if (type === "dereverb") return { ...base, name: "De-reverb", amount: 50, tail: 300, residual: 12, mix: 100 };
   if (type === "mbcomp") return { ...base, name: "Multiband", selBand: 0, mix: 100, xovers: [250, 2500], bands: [
     { threshold: -24, ratio: 3, attack: 15, release: 150, knee: 6, makeup: 0, bypass: false, detector: "feedforward", mode: "down", range: 24 },
     { threshold: -22, ratio: 3, attack: 10, release: 120, knee: 6, makeup: 0, bypass: false, detector: "feedforward", mode: "down", range: 24 },
@@ -124,6 +125,7 @@ function paramsFor(m) {
   if (m.type === "trans") return { attack: m.attack, sustain: m.sustain, output: m.output };
   if (m.type === "gate") return { threshold: m.threshold, ratio: m.ratio, range: m.range, attack: m.attack, release: m.release, hold: m.hold };
   if (m.type === "denoise") return { amount: m.amount, floor: m.floor };
+  if (m.type === "dereverb") return { amount: m.amount, tail: m.tail, residual: m.residual, mix: m.mix };
   return {}; // analyzer has nothing to send
 }
 function send(msg) { try { chrome.runtime.sendMessage({ target: "offscreen", ...msg }); } catch {} }
@@ -465,6 +467,12 @@ const BUILTIN_MODULE_PRESETS = {
     "Voice (strong)": { amount: 78, floor: 5 },
     "Aggressive": { amount: 92, floor: 3 },
   },
+  dereverb: {
+    "Light": { amount: 35, tail: 250, residual: 18, mix: 100 },
+    "Room": { amount: 55, tail: 350, residual: 12, mix: 100 },
+    "Strong": { amount: 80, tail: 550, residual: 6, mix: 100 },
+    "Vocal (parallel)": { amount: 70, tail: 300, residual: 10, mix: 70 },
+  },
   analyzer: {
     "Default": { speed: 2, smooth: 0.5, ceiling: -20, range: 75, contrast: 1.6, sharpen: 0.6, q: 20, fft: 16384, colormap: "magma", fMin: 20, fMax: 20000, grid: true },
     "High-Res": { speed: 2, smooth: 0.6, ceiling: -15, range: 80, contrast: 2, sharpen: 1, q: 32, fft: 32768, colormap: "inferno", fMin: 20, fMax: 20000, grid: true },
@@ -536,7 +544,7 @@ function injectModulePresetBar(m, selectName) {
 
 // ---------- rack list (with drag-and-drop) ----------
 const listEl = document.getElementById("moduleList");
-const TAGS = { eq: "EQ", comp: "Comp", limiter: "Limiter", utility: "Util", mbcomp: "MBand", analyzer: "Scope", sat: "Sat", trans: "Trans", gate: "Gate", denoise: "Denoise" };
+const TAGS = { eq: "EQ", comp: "Comp", limiter: "Limiter", utility: "Util", mbcomp: "MBand", analyzer: "Scope", sat: "Sat", trans: "Trans", gate: "Gate", denoise: "Denoise", dereverb: "Dereverb" };
 let dragId = null;
 
 function renderRack() {
@@ -683,6 +691,7 @@ function renderEditor() {
   else if (m.type === "trans") renderTrans(m);
   else if (m.type === "gate") renderGate(m);
   else if (m.type === "denoise") renderDenoise(m);
+  else if (m.type === "dereverb") renderDereverb(m);
   else renderAnalyzer(m);
   const rb = document.getElementById("resetMod");
   if (rb) rb.onclick = () => resetModule(m);
@@ -2017,6 +2026,101 @@ function renderDenoise(m) {
   currentDraw = function () {
     const meter = (engine.meters && engine.meters[m.id]) || {};
     const gr = Math.max(0, meter.gr || 0);
+    grFill.style.height = clamp(gr / 24, 0, 1) * 100 + "%";
+    grVal.textContent = gr.toFixed(1);
+  };
+}
+
+// ===================== De-reverb =====================
+function renderDereverb(m) {
+  m.amount = m.amount ?? 50; m.tail = m.tail ?? 300; m.residual = m.residual ?? 12; m.mix = m.mix ?? 100;
+  m.zoom = m.zoom ?? 2500;
+  edEl.innerHTML = `
+    ${edHead(m.name, "De-reverb")}
+    <div class="dyn">
+      <div class="lim-graph" style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
+        <div class="graphwrap" title="Input level (blue) vs the de-reverbed output (green). The red is the reverb tail being removed — watch it shrink between words/notes as you raise Amount."><canvas id="drvCanvas"></canvas></div>
+        <label class="hint" style="display:flex; align-items:center; gap:8px" title="How much history is shown across the graph.">Zoom
+          <input type="range" id="drvZoom" min="500" max="8000" step="100" value="${m.zoom}" style="flex:1">
+          <span id="drvZoomV" style="min-width:48px; text-align:right">${(m.zoom / 1000).toFixed(1)} s</span>
+        </label>
+      </div>
+      <div>
+        <div class="meterbox" style="margin-bottom:16px"><div><div class="meter" style="height:150px"><div class="fill" id="grFill"></div></div><div class="meter-label">Removed <span id="grVal">0.0</span></div></div></div>
+        <div class="knobs" style="grid-template-columns:1fr 1fr">
+          ${knob("amount", "Amount", m.amount, 0, 100, 1, "%")}
+          ${knob("tail", "Tail", m.tail, 50, 1500, 10, "ms")}
+          ${knob("residual", "Residual", m.residual, 0, 50, 1, "%")}
+          ${knob("mix", "Dry/Wet", m.mix, 0, 100, 1, "%")}
+        </div>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:14px; font-style:normal"><b>Amount</b> = how hard the decaying tails are pulled down · <b>Tail</b> = how long a reverb to chase (set near the room's decay) · <b>Residual</b> leaves a little tail so it stays natural · onsets and steady notes pass through untouched. (Latency ~8 ms.)</p>`;
+  wireKnobs(m, ["amount", "tail", "residual", "mix"]);
+  const atkTip = document.getElementById("k_amount"); if (atkTip) atkTip.closest(".knob").title = "0% = bypass. Higher pulls reverb decays down harder.";
+
+  const canvas = document.getElementById("drvCanvas");
+  const dims = makeCanvas(canvas, 0.42);
+  const ctx = canvas.getContext("2d");
+  const grFill = document.getElementById("grFill"), grVal = document.getElementById("grVal");
+  const zoomEl = document.getElementById("drvZoom"), zoomV = document.getElementById("drvZoomV");
+  let zoomMs = m.zoom;
+  function setZoom(v) { zoomMs = clamp(Math.round(v), 500, 8000); m.zoom = zoomMs; zoomEl.value = zoomMs; zoomV.textContent = (zoomMs / 1000).toFixed(1) + " s"; save(); }
+  zoomEl.addEventListener("input", () => setZoom(+zoomEl.value));
+  canvas.addEventListener("wheel", (e) => { e.preventDefault(); setZoom(zoomMs * (e.deltaY > 0 ? 1.15 : 1 / 1.15)); }, { passive: false });
+
+  const DBMIN = -70, DBMAX = 0, MAXHIST = 26000, MAXDRAW = 1200;
+  const histIn = [], histRed = []; // input level + reduction (dB), newest at the right
+  let grHold = 0;
+  currentDraw = function () {
+    const { W, H, dpr } = dims();
+    const me = (engine.meters && engine.meters[m.id]) || {};
+    if (engine.running && me.trace) for (const pr of me.trace) { histIn.push(pr[0]); histRed.push(pr[1]); }
+    if (histIn.length > MAXHIST) { const ex = histIn.length - MAXHIST; histIn.splice(0, ex); histRed.splice(0, ex); }
+
+    const Y = (db) => (1 - (clamp(db, DBMIN, DBMAX) - DBMIN) / (DBMAX - DBMIN)) * H;
+    ctx.clearRect(0, 0, W, H);
+    ctx.strokeStyle = "#1c2430"; ctx.lineWidth = 1 * dpr; ctx.fillStyle = "#3a4452"; ctx.font = `${10 * dpr}px system-ui`; ctx.textBaseline = "middle"; ctx.textAlign = "right";
+    for (let db = 0; db >= -70; db -= 10) { const y = Y(db); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); ctx.fillText(db, W - 3 * dpr, y); }
+    ctx.textAlign = "left";
+
+    const len = histIn.length;
+    const colsPerSec = (engine.sampleRate || 48000) / 128; // one trace pair per 128-sample quantum
+    const vc = clamp(Math.round((zoomMs / 1000) * colsPerSec), 8, Math.max(8, len));
+    if (len > 1) {
+      const start = len - vc, drawN = Math.min(vc, MAXDRAW);
+      const inV = new Float32Array(drawN), redV = new Float32Array(drawN);
+      for (let k = 0; k < drawN; k++) {
+        const lo = start + Math.floor((k * vc) / drawN); let hi = start + Math.floor(((k + 1) * vc) / drawN); if (hi <= lo) hi = lo + 1;
+        let im = -200, rm = 0;
+        for (let i = lo; i < hi && i < len; i++) { if (histIn[i] > im) im = histIn[i]; if (histRed[i] > rm) rm = histRed[i]; }
+        inV[k] = im; redV[k] = rm;
+      }
+      const xAt = (k) => (drawN <= 1 ? W : (k / (drawN - 1)) * W);
+      const outAt = (k) => inV[k] - redV[k]; // de-reverbed level
+      // input level mountain
+      const grad = ctx.createLinearGradient(0, 0, 0, H);
+      grad.addColorStop(0, "rgba(120,170,225,0.40)"); grad.addColorStop(1, "rgba(70,110,165,0.07)");
+      ctx.beginPath(); ctx.moveTo(xAt(0), H);
+      for (let k = 0; k < drawN; k++) ctx.lineTo(xAt(k), Y(inV[k]));
+      ctx.lineTo(xAt(drawN - 1), H); ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+      // removed reverb (red) = between output and input
+      ctx.beginPath();
+      for (let k = 0; k < drawN; k++) ctx.lineTo(xAt(k), Y(inV[k]));
+      for (let k = drawN - 1; k >= 0; k--) ctx.lineTo(xAt(k), Y(outAt(k)));
+      ctx.closePath(); ctx.fillStyle = "rgba(229,86,75,0.5)"; ctx.fill();
+      // output (de-reverbed) line
+      ctx.beginPath();
+      for (let k = 0; k < drawN; k++) { const x = xAt(k), y = Y(outAt(k)); k === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+      ctx.strokeStyle = "rgba(150,205,175,0.85)"; ctx.lineWidth = 1.3 * dpr; ctx.stroke();
+    }
+    ctx.textBaseline = "top"; ctx.font = `${10 * dpr}px system-ui`;
+    ctx.fillStyle = "rgba(150,200,255,0.85)"; ctx.fillText("input", 6 * dpr, 4 * dpr);
+    ctx.fillStyle = "rgba(255,140,130,0.95)"; ctx.fillText("reverb removed", 46 * dpr, 4 * dpr);
+    ctx.fillStyle = "rgba(150,205,175,0.95)"; ctx.fillText("output", 150 * dpr, 4 * dpr);
+
+    const gr = Math.max(0, me.gr || 0);
+    grHold = gr > grHold ? gr : grHold * 0.9 + gr * 0.1;
     grFill.style.height = clamp(gr / 24, 0, 1) * 100 + "%";
     grVal.textContent = gr.toFixed(1);
   };

@@ -44,6 +44,7 @@ needs a live user gesture that doesn't survive the hop to the worker.
 | **Multiband** | Linkwitz-Riley split into N bands, a compressor per band, OTT-capable. |
 | **Gate / Expander** | Threshold/ratio/range/attack/release/hold with a live open/closed + level display. |
 | **Denoise** | Spectral noise suppressor (min-statistics + Wiener gate). 0% = transparent. |
+| **De-reverb** | STFT decay-expander: pulls down reverb tails while passing transients and sustained notes, with a scrolling input-vs-output display. |
 | **Transient** | Attack / sustain envelope shaping. |
 | **Saturator** | Tube / tape / crunch / fold / hard waveshapers with **oversampling** (anti-aliased). |
 | **Limiter** | Look-ahead brick-wall with attack/hold/channel-link, **oversampled true-peak detection**, per-**style** character, unity-gain match, DC filter, **LUFS + dBTP metering**. |
