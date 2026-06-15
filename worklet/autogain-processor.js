@@ -3,8 +3,8 @@
 // bringing quiet content up and loud content down. Boost is slow (no pumping
 // between words); cut is faster (tames loud bursts). A gate freezes the gain
 // when the signal drops below a floor so it never pumps up silence/noise, and a
-// Range limits how far it will move. A final clamp prevents digital overs (add a
-// Limiter after it for clean peak control).
+// Range limits how far it will move. A built-in brick-wall peak limiter (-1 dBFS,
+// zero overshoot) means even large boosts never clip.
 // Params: { target(LUFS), speed(0..100), range(dB), gate(LUFS) }.
 // Posts a scrolling [lufs, gainDb] trace for the display: { type:'meter', s }.
 
@@ -31,6 +31,9 @@ class AutoGainProcessor extends AudioWorkletProcessor {
     this.target = -16; this.speed = 50; this.range = 12; this.gate = -45;
     this.gainDb = 0;
     this.kPow = 0;
+    // built-in brick-wall: a zero-overshoot peak limiter at -1 dBFS so even large
+    // boosts can never clip the output (no scary digital crunch).
+    this.limG = 1; this.ceil = Math.pow(10, -1 / 20); this.limRel = Math.exp(-1 / (0.05 * sampleRate));
     // loudness follower: fast attack so a loud onset after silence registers quickly,
     // slower release so the level doesn't jitter (asymmetric momentary loudness).
     this.aAtk = 1 - Math.exp(-1 / (0.05 * sampleRate)); // ~50 ms
@@ -84,11 +87,15 @@ class AutoGainProcessor extends AudioWorkletProcessor {
       this.gainDb = desired + (this.gainDb - desired) * co;
 
       const g = Math.pow(10, this.gainDb / 20);
-      for (let ch = 0; ch < chans; ch++) {
-        let o = input[ch][i] * g;
-        if (o > 1) o = 1; else if (o < -1) o = -1; // safety clamp (use a Limiter after for clean peaks)
-        output[ch][i] = o;
-      }
+      let oL = input[0][i] * g, oR = chans > 1 ? input[1][i] * g : oL;
+      // brick-wall peak limiter (stereo-linked): the gain that keeps this sample at/under
+      // the ceiling, applied instantly (no overshoot) and released smoothly.
+      const pk = Math.abs(oL) > Math.abs(oR) ? Math.abs(oL) : Math.abs(oR);
+      const needed = pk > this.ceil ? this.ceil / pk : 1;
+      this.limG = needed < this.limG ? needed : this.limG + (needed - this.limG) * this.limRel;
+      oL *= this.limG; oR *= this.limG;
+      output[0][i] = oL;
+      if (output.length > 1) output[1][i] = oR;
     }
 
     this.frames += n;

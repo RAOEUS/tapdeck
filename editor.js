@@ -605,7 +605,7 @@ const BUILTIN_MODULE_PRESETS = {
     "Dialog / Podcast": { target: -16, speed: 70, range: 15, gate: -42 },
     "Gentle (album)": { target: -18, speed: 20, range: 9, gate: -48 },
     "Aggressive Leveler": { target: -14, speed: 85, range: 18, gate: -40 },
-    "Quiet Boost": { target: -14, speed: 50, range: 24, gate: -50 },
+    "Quiet Boost": { target: -14, speed: 50, range: 36, gate: -50 },
   },
   dereverb: {
     "Light": { amount: 35, tail: 250, residual: 18, mix: 100 },
@@ -2320,7 +2320,7 @@ function showAgMeasured(m, an) {
   if (!out) return;
   if (an.n > 50 && an.lufs > -120) {
     const gap = m.target - an.lufs; // + = the content needs a boost to reach the target
-    const need = Math.min(24, Math.max(3, Math.ceil(Math.abs(gap)) + 3)); // Max gain that covers it, with headroom
+    const need = Math.min(36, Math.max(3, Math.ceil(Math.abs(gap)) + 3)); // Max gain that covers it, with headroom
     const dir = Math.abs(gap) < 0.5 ? "right at your target" : `${Math.abs(gap).toFixed(1)} dB ${gap > 0 ? "under" : "over"} your ${m.target} LUFS target`;
     const reach = Math.abs(gap) <= m.range;
     out.innerHTML = `
@@ -2387,7 +2387,7 @@ function renderAutoGain(m) {
     <div class="knobs" style="max-width:640px; margin-top:14px; grid-template-columns:repeat(4,1fr)">
       ${knob("target", "Target", m.target, -30, -6, 0.5, " LUFS")}
       ${knob("speed", "Speed", m.speed, 0, 100, 1, "")}
-      ${knob("range", "Max gain", m.range, 0, 24, 1, " dB")}
+      ${knob("range", "Max gain", m.range, 0, 36, 1, " dB")}
       ${knob("gate", "Gate", m.gate, -70, -20, 1, " LUFS")}
     </div>
     <p class="hint" id="agReadout" style="margin-top:12px; font-style:normal">Listening…</p>`;
@@ -2396,7 +2396,7 @@ function renderAutoGain(m) {
   const tip = (key, t) => { const e = document.getElementById("k_" + key); if (e) e.closest(".knob").title = t; };
   tip("target", "The loudness to aim for (LUFS). Around -16 suits general listening; lower targets are louder. Matches the Limiter's LUFS meter.");
   tip("speed", "How quickly it adapts. Lower = album-style (rides slowly, preserves dynamics); higher = dialog-style (levels fast). Boosting is always slower than cutting.");
-  tip("range", "The maximum the gain will move, up or down (± dB). Keeps it from over-boosting quiet passages or over-cutting loud ones.");
+  tip("range", "The maximum the gain will move, up or down (± dB). Big boosts are safe - a built-in brick-wall limiter at -1 dBFS keeps the output from ever clipping.");
   tip("gate", "Below this loudness the gain freezes, so it never pumps up silence or background noise between sounds.");
 
   const canvas = document.getElementById("agCanvas");

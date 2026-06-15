@@ -1,7 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { loadWorklet, send, render, rms } = require("./harness");
+const { loadWorklet, send, render, rms, peak } = require("./harness");
 
 const SR = 48000;
 const tone = (amp, f = 300) => (t) => amp * Math.sin((2 * Math.PI * f * t) / SR);
@@ -40,6 +40,16 @@ test("auto-gain measures program loudness (louder reads higher)", () => {
   assert.ok(loud && quiet && loud.n > 50 && quiet.n > 50, "should accumulate samples");
   assert.ok(loud.lufs > quiet.lufs + 5, `louder content should read higher LUFS: ${loud.lufs.toFixed(1)} vs ${quiet.lufs.toFixed(1)}`);
   assert.ok(loud.lufs < 0 && loud.lufs > -40, `plausible LUFS, got ${loud.lufs.toFixed(1)}`);
+});
+
+test("auto-gain has a built-in brick-wall (big boosts never clip)", () => {
+  const { Processor } = loadWorklet("autogain-processor.js");
+  const p = new Processor();
+  send(p, { target: -6, speed: 100, range: 36, gate: -60 }); // push a quiet input hard toward a loud target
+  const blocks = render(p, tone(0.05, 220), { blocks: 1400 }); // ~ -26 dBFS in
+  const ceil = Math.pow(10, -1 / 20);
+  assert.ok(peak(blocks, 0, 500) <= ceil + 2e-3, `output must stay under the -1 dBFS brick wall, got ${peak(blocks, 0, 500).toFixed(3)}`);
+  assert.ok(rms(blocks, 0, 500) > (0.05 / Math.SQRT2) * 3, "and the quiet input is strongly boosted");
 });
 
 test("auto-gain holds (doesn't boost) below the gate", () => {
