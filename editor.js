@@ -100,7 +100,7 @@ function defaultModule(type) {
   if (type === "comp") return { ...base, name: "Compressor", threshold: -18, ratio: 4, ratioUp: 4, attack: 10, release: 120, knee: 6, makeup: 0, detector: "feedforward", mode: "down", range: 24, mix: 100 };
   if (type === "limiter") return { ...base, name: "Limiter", inputGain: 0, ceiling: -1, attack: 0, release: 60, hold: 5, lookahead: 5, link: 100, os: 1, style: "transparent", unity: false, dc: false, zoom: 1000 };
   if (type === "utility") return { ...base, name: "Utility", gain: 0, pan: 0, width: 1, mono: false, invL: false, invR: false, swap: false, crossfeed: 0 };
-  if (type === "sat") return { ...base, name: "Saturator", drive: 6, mode: "tube", tone: 0, mix: 100, output: 0 };
+  if (type === "sat") return { ...base, name: "Saturator", drive: 6, mode: "tube", tone: 0, mix: 100, output: 0, os: 2 };
   if (type === "trans") return { ...base, name: "Transient", attack: 0, sustain: 0, output: 0 };
   if (type === "gate") return { ...base, name: "Gate", threshold: -45, ratio: 4, range: 50, attack: 1, release: 120, hold: 12 };
   if (type === "denoise") return { ...base, name: "Denoise", amount: 60, floor: 6 };
@@ -120,7 +120,7 @@ function paramsFor(m) {
   if (m.type === "limiter") return { inputGain: m.inputGain, ceiling: m.ceiling, attack: m.attack, release: m.release, hold: m.hold, lookahead: m.lookahead, link: m.link, os: m.os, style: m.style, unity: m.unity, dc: m.dc };
   if (m.type === "utility") return { gain: m.gain, pan: m.pan, width: m.width, mono: m.mono, invL: m.invL, invR: m.invR, swap: m.swap, crossfeed: m.crossfeed || 0 };
   if (m.type === "mbcomp") return { xovers: m.xovers, bands: m.bands, mix: m.mix };
-  if (m.type === "sat") return { drive: m.drive, mode: m.mode, tone: m.tone, mix: m.mix, output: m.output };
+  if (m.type === "sat") return { drive: m.drive, mode: m.mode, tone: m.tone, mix: m.mix, output: m.output, os: m.os };
   if (m.type === "trans") return { attack: m.attack, sustain: m.sustain, output: m.output };
   if (m.type === "gate") return { threshold: m.threshold, ratio: m.ratio, range: m.range, attack: m.attack, release: m.release, hold: m.hold };
   if (m.type === "denoise") return { amount: m.amount, floor: m.floor };
@@ -588,6 +588,7 @@ function renderEQ(m) {
       <label>Preamp <input type="number" id="eqPreamp" value="${(m.preamp || 0).toFixed(1)}" step="0.5" min="-24" max="24" style="width:62px"> dB</label>
       <label title="Dry/Wet: scales every bell/shelf band's gain toward flat - phase-coherent, no comb filtering">Dry/Wet <input type="number" id="eqMix" value="${m.mix ?? 100}" step="1" min="0" max="100" style="width:58px"> %</label>
       <button class="primary" id="addBand">+ Add band</button>
+      <button id="eqSolo" title="Solo the selected band — hear exactly the change it makes (the band, phase-cancelled against the dry signal)">Solo band</button>
       <button id="eqImport" title="Import an AutoEQ ParametricEQ.txt file">Import AutoEQ</button>
       <input type="file" id="eqFile" accept=".txt,text/plain" style="display:none">
       <span class="hint">drag = freq/gain · alt-drag/wheel = Q · ctrl+alt-drag = dyn range · dbl-click = add · right-click = menu</span>
@@ -605,6 +606,18 @@ function renderEQ(m) {
   document.getElementById("addBand").addEventListener("click", () => {
     m.bands.push({ id: nid(), type: "peaking", freq: 1000, gain: 0, q: 1, enabled: true }); commit();
   });
+  // Solo (momentary, not persisted): the worklet plays only the selected band's
+  // change, captured live from the cascade (so it includes dynamic-EQ movement).
+  // We just send the band id; ongoing freq/gain/dyn edits flow via the normal
+  // bands sync, so no extra resync is needed.
+  let soloOn = false;
+  function pushSolo() {
+    const b = m.bands[m.sel];
+    send({ type: "set-param", tabId: selectedTab, id: m.id, params: { soloId: (soloOn && b) ? b.id : null } });
+  }
+  const soloBtn = document.getElementById("eqSolo");
+  soloBtn.addEventListener("click", () => { soloOn = !soloOn; soloBtn.classList.toggle("on", soloOn); pushSolo(); });
+  pushSolo(); // clear any stale solo in the worklet on (re)entry
   const preampEl = document.getElementById("eqPreamp");
   preampEl.addEventListener("input", () => { if (preampEl.value === "") return; m.preamp = clamp(+preampEl.value, -24, 24); pushParam(m); save(); });
   const mixEl = document.getElementById("eqMix");
@@ -665,6 +678,7 @@ function renderEQ(m) {
     m.sel = i;
     [...rows.children].forEach((tr, j) => tr.classList.toggle("sel", j === i));
     renderDynPanel();
+    if (soloOn) pushSolo(); // solo follows the selected band
   }
   // per-band dynamics (compression) editor for the selected band
   function renderDynPanel() {
@@ -1633,10 +1647,12 @@ function satShape(mode, x) {
   }
 }
 function renderSat(m) {
-  m.mode = m.mode || "tube"; m.drive = m.drive ?? 6; m.tone = m.tone ?? 0; m.mix = m.mix ?? 100; m.output = m.output ?? 0;
+  m.mode = m.mode || "tube"; m.drive = m.drive ?? 6; m.tone = m.tone ?? 0; m.mix = m.mix ?? 100; m.output = m.output ?? 0; m.os = m.os ?? 2;
+  const osOpts = [[1, "Off"], [2, "2×"], [4, "4×"]].map(([v, l]) => `<option value="${v}" ${m.os == v ? "selected" : ""}>${l}</option>`).join("");
   edEl.innerHTML = `
     <div class="ed-head"><h1>${m.name}</h1><span class="tag">Saturation</span>
       <label class="detsel">Character <select id="satMode">${SAT_MODES.map((s) => `<option ${s === m.mode ? "selected" : ""}>${s}</option>`).join("")}</select></label>
+      <label class="detsel" title="Run the waveshaper oversampled so its harmonics above Nyquist don't alias back as harshness. Higher = cleaner, more CPU.">Oversampling <select id="satOS">${osOpts}</select></label>
       <button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div>
     <div class="dyn">
       <div class="graphwrap"><canvas id="satCanvas"></canvas></div>
@@ -1652,6 +1668,7 @@ function renderSat(m) {
     </div>`;
   wireKnobs(m, ["drive", "tone", "mix", "output"]);
   document.getElementById("satMode").addEventListener("change", (e) => { m.mode = e.target.value; pushParam(m); save(); });
+  document.getElementById("satOS").addEventListener("change", (e) => { m.os = Number(e.target.value); pushParam(m); save(); });
   const canvas = document.getElementById("satCanvas"); const dims = makeCanvas(canvas, 0.72); const ctx = canvas.getContext("2d");
   const satFill = document.getElementById("satFill"), satVal = document.getElementById("satVal");
   currentDraw = function () {

@@ -133,6 +133,7 @@ canvas { display: block; width: 100%; }
 .toolbar button:hover { box-shadow: var(--nm-out); }
 .toolbar button:active { box-shadow: var(--nm-in); }
 .toolbar button.primary { background: var(--accent); color: #06121d; }
+.toolbar button.on { box-shadow: var(--nm-in); color: var(--accent); }
 select, input[type="number"] {
   background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 4px 7px; font: inherit; outline: none;
 }

@@ -95,12 +95,14 @@ class EQProcessor extends AudioWorkletProcessor {
     this.detAtk = Math.exp(-1 / (0.001 * sampleRate)); // dynamic detector envelope: 1 ms attack
     this.detRel = Math.exp(-1 / (0.05 * sampleRate));  // 50 ms release
     this.frames = 0;
+    this.soloId = null; // id of the band to solo (hear only its change); null = normal
     this.port.onmessage = (e) => {
       const d = e.data || {};
       let rebuild = false;
       if (typeof d.preamp === "number") { this.preampDb = d.preamp; rebuild = true; }
       if (typeof d.mix === "number") { this.mix = d.mix; this.mixF = d.mix * 0.01; rebuild = true; }
       if (Array.isArray(d.bands)) { this.specs = d.bands; rebuild = true; }
+      if ("soloId" in d) this.soloId = d.soloId;
       if (rebuild) this.setBands(this.specs);
     };
   }
@@ -129,7 +131,7 @@ class EQProcessor extends AudioWorkletProcessor {
         det: dyn ? designBiquad("bandpass", b.freq, Math.max(0.7, b.q), 0, sampleRate) : null,
         detState: prev ? prev.detState : [0, 0, 0, 0],
         env: prev ? prev.env : 0, dynDb: prev ? prev.dynDb : 0,
-        sGain: b.gain || 0, sType: b.type, sFreq: b.freq, sQ: b.q,
+        sGain: b.gain || 0, sType: b.type, sFreq: b.freq, sQ: b.q, id: b.id,
       };
     });
   }
@@ -140,9 +142,20 @@ class EQProcessor extends AudioWorkletProcessor {
     if (!input || input.length === 0) return true;
     const chans = input.length;
     const n = input[0].length;
-    const a = this.smoothA;
 
+    const a = this.smoothA;
     for (let ch = 0; ch < chans; ch++) output[ch].set(input[ch]); // cascade runs in place
+
+    // band solo: find the soloed band in the live cascade. We capture its exact
+    // in/out difference during the cascade below (phase cancellation), so the solo
+    // reflects everything the band actually does — including dynamic-EQ movement
+    // and dry/wet scaling — not just a static filter.
+    let soloIdx = -1;
+    if (this.soloId != null) {
+      for (let bi = 0; bi < this.bands.length; bi++) if (this.bands[bi].id === this.soloId) { soloIdx = bi; break; }
+      if (soloIdx < 0) { for (let ch = 0; ch < chans; ch++) output[ch].fill(0); return true; } // disabled/invalid band = no change
+      if (!this.preBuf || this.preBuf[0].length !== n) this.preBuf = [new Float32Array(n), new Float32Array(n)];
+    }
 
     // dynamic bands: run each one's sidechain detector over the (original) input and
     // redesign its filter at static + dynamic gain before the cascade applies it.
@@ -171,7 +184,17 @@ class EQProcessor extends AudioWorkletProcessor {
       band.sections[0].target = designBiquad(band.sType, band.sFreq, band.sQ, (band.sGain + band.dynDb) * this.mixF, sampleRate);
     }
 
+    // ship live per-band dynamic gain so the UI can move the nodes/curve. Done here
+    // (after detection, before the cascade) so it also fires in solo mode, which
+    // returns early below.
+    this.frames += n;
+    if (this.frames >= 256) {
+      this.frames = 0;
+      if (anyDyn) this.port.postMessage({ type: "meter", mb: this.bands.map((b) => b.dynMode !== "off" ? b.dynDb : 0) });
+    }
+
     for (let bi = 0; bi < this.bands.length; bi++) {
+      if (bi === soloIdx) for (let ch = 0; ch < chans; ch++) this.preBuf[ch].set(output[ch]); // signal entering this band
       const sections = this.bands[bi].sections;
       for (let si = 0; si < sections.length; si++) {
         const sec = sections[si], c = sec.cur, t = sec.target;
@@ -191,16 +214,14 @@ class EQProcessor extends AudioWorkletProcessor {
           }
         }
       }
+      if (bi === soloIdx) { // solo: output only this band's change (post − pre), then stop
+        for (let ch = 0; ch < chans; ch++) { const o = output[ch], p = this.preBuf[ch]; for (let i = 0; i < n; i++) o[i] -= p[i]; }
+        return true;
+      }
     }
 
     if (this.preampLin !== 1) {
       for (let ch = 0; ch < chans; ch++) { const o = output[ch]; for (let i = 0; i < n; i++) o[i] *= this.preampLin; }
-    }
-
-    this.frames += n; // ship live per-band dynamic gain so the UI can move the nodes
-    if (this.frames >= 256) {
-      this.frames = 0;
-      if (anyDyn) this.port.postMessage({ type: "meter", mb: this.bands.map((b) => b.dynMode !== "off" ? b.dynDb : 0) });
     }
     return true;
   }
