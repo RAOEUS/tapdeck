@@ -31,7 +31,10 @@ class AutoGainProcessor extends AudioWorkletProcessor {
     this.target = -16; this.speed = 50; this.range = 12; this.gate = -45;
     this.gainDb = 0;
     this.kPow = 0;
-    this.aPow = 1 - Math.exp(-1 / (0.4 * sampleRate)); // ~400 ms momentary loudness
+    // loudness follower: fast attack so a loud onset after silence registers quickly,
+    // slower release so the level doesn't jitter (asymmetric momentary loudness).
+    this.aAtk = 1 - Math.exp(-1 / (0.05 * sampleRate)); // ~50 ms
+    this.aRel = 1 - Math.exp(-1 / (0.4 * sampleRate));  // ~400 ms
     [this.kw1, this.kw2] = kWeightCoeffs(sampleRate);
     this.kSt = [[[0, 0, 0, 0], [0, 0, 0, 0]], [[0, 0, 0, 0], [0, 0, 0, 0]]];
     this.frames = 0; this.trace = [];
@@ -48,8 +51,8 @@ class AutoGainProcessor extends AudioWorkletProcessor {
 
   recalc() {
     const s = Math.min(1, Math.max(0, this.speed / 100));
-    const riseT = 4.0 * (1 - s) + 0.4 * s;   // boost (up) time constant, slow -> fast
-    const fallT = riseT * 0.35;              // cut (down) faster, to catch loud bursts
+    const riseT = 4.0 * (1 - s) + 0.4 * s;   // boost (up) time constant: slow album -> fast dialog
+    const fallT = 0.25 * (1 - s) + 0.05 * s; // cut (down) is always fast so loud onsets are caught quickly
     this.upCoeff = Math.exp(-1 / (riseT * sampleRate));
     this.downCoeff = Math.exp(-1 / (fallT * sampleRate));
   }
@@ -68,7 +71,7 @@ class AutoGainProcessor extends AudioWorkletProcessor {
         const k = kbiquad(this.kw2, this.kSt[ch][1], kbiquad(this.kw1, this.kSt[ch][0], input[ch][i]));
         kp += k * k;
       }
-      this.kPow += (kp - this.kPow) * this.aPow;
+      this.kPow += (kp - this.kPow) * (kp > this.kPow ? this.aAtk : this.aRel);
       lufs = -0.691 + 10 * Math.log10(this.kPow + 1e-12);
 
       // desired gain toward the target, gated + range-limited; hold below the gate
