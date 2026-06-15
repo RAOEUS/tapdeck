@@ -4,7 +4,7 @@
 // Params: { threshold(dB), ratio, range(dB), attack(ms), release(ms), hold(ms) }.
 // Posts for the meter: { type:'meter', gr: dB >= 0, level: input peak dBFS }.
 
-class GateProcessor extends AudioWorkletProcessor {
+class GateProcessor extends BaseProcessor {
   constructor() {
     super();
     this.threshold = -45; this.ratio = 4; this.range = 50;
@@ -13,16 +13,16 @@ class GateProcessor extends AudioWorkletProcessor {
     this.holdCount = 0;
     this.frames = 0; this.meterGR = 0; this.meterLevel = -120;
     this.recalc();
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.threshold === "number") this.threshold = d.threshold;
-      if (typeof d.ratio === "number") this.ratio = d.ratio;
-      if (typeof d.range === "number") this.range = d.range;
-      if (typeof d.attack === "number") this.attack = d.attack;
-      if (typeof d.release === "number") this.release = d.release;
-      if (typeof d.hold === "number") this.hold = d.hold;
-      this.recalc();
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.threshold === "number") this.threshold = d.threshold;
+    if (typeof d.ratio === "number") this.ratio = d.ratio;
+    if (typeof d.range === "number") this.range = d.range;
+    if (typeof d.attack === "number") this.attack = d.attack;
+    if (typeof d.release === "number") this.release = d.release;
+    if (typeof d.hold === "number") this.hold = d.hold;
+    this.recalc();
   }
 
   recalc() {
@@ -62,7 +62,7 @@ class GateProcessor extends AudioWorkletProcessor {
     this.frames += n;
     if (this.frames >= 256) {
       this.frames = 0;
-      this.port.postMessage({ type: "meter", gr: this.meterGR, level: this.meterLevel });
+      this.meter({ gr: this.meterGR, level: this.meterLevel });
       this.meterGR *= 0.6; this.meterLevel = -120;
     }
     return true;

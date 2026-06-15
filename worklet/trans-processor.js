@@ -4,20 +4,20 @@
 // Params: { attack(-100..100), sustain(-100..100), output(dB) }.
 // Posts the signed gain (dB) for a bidirectional meter: { type:'meter', gr }.
 
-class TransProcessor extends AudioWorkletProcessor {
+class TransProcessor extends BaseProcessor {
   constructor() {
     super();
     this.attack = 0; this.sustain = 0; this.output = 0;
     this.envFast = 0; this.envSlow = 0; this.gainDb = 0;
     this.frames = 0; this.meterGain = 0;
     this.recalc();
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.attack === "number") this.attack = d.attack;
-      if (typeof d.sustain === "number") this.sustain = d.sustain;
-      if (typeof d.output === "number") this.output = d.output;
-      this.recalc();
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.attack === "number") this.attack = d.attack;
+    if (typeof d.sustain === "number") this.sustain = d.sustain;
+    if (typeof d.output === "number") this.output = d.output;
+    this.recalc();
   }
 
   recalc() {
@@ -54,7 +54,7 @@ class TransProcessor extends AudioWorkletProcessor {
     this.frames += n;
     if (this.frames >= 256) {
       this.frames = 0;
-      this.port.postMessage({ type: "meter", gr: this.meterGain });
+      this.meter({ gr: this.meterGain });
       this.meterGain *= 0.6;
     }
     return true;

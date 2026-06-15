@@ -214,6 +214,10 @@ async function startCapture(streamId, tab, rack) {
 
     // "interactive" = smallest output buffer Chrome will give us (lowest latency)
     s.ctx = new AudioContext({ latencyHint: "interactive" }); // may throw if too many tabs captured at once
+    // Shared DSP + BaseProcessor must be evaluated in the worklet scope BEFORE any
+    // processor (each one references TapdeckDSP / BaseProcessor at class-definition
+    // time), so load it first and await it; then the rest can load in parallel.
+    await s.ctx.audioWorklet.addModule("worklet/dsp-shared.js");
     await Promise.all(Object.values(WORKLETS).map((p) => s.ctx.audioWorklet.addModule(p)));
     s.source = s.ctx.createMediaStreamSource(s.stream);
     // STFT analyzer node (pass-through). Streams log-spectrum columns when active.

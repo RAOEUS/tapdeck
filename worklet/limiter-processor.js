@@ -25,27 +25,8 @@ const STYLES = {
   aggressive: [0.4, 0.42],
 };
 
-function kbiquad(c, st, x) { // direct form I; st = [x1,x2,y1,y2]
-  const y = c[0] * x + c[1] * st[0] + c[2] * st[1] - c[3] * st[2] - c[4] * st[3];
-  st[1] = st[0]; st[0] = x; st[3] = st[2]; st[2] = y;
-  return y;
-}
-// K-weighting (BS.1770): high-shelf "pre-filter" then RLB high-pass.
-function kWeightCoeffs(sr) {
-  let f0 = 1681.974450955533, G = 3.999843853973347, Q = 0.7071752369554196;
-  let K = Math.tan(Math.PI * f0 / sr);
-  const Vh = Math.pow(10, G / 20), Vb = Math.pow(Vh, 0.4996667741545416);
-  let a0 = 1 + K / Q + K * K;
-  const s1 = [
-    (Vh + Vb * K / Q + K * K) / a0, 2 * (K * K - Vh) / a0, (Vh - Vb * K / Q + K * K) / a0,
-    2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0,
-  ];
-  f0 = 38.13547087602444; Q = 0.5003270373238773;
-  K = Math.tan(Math.PI * f0 / sr);
-  a0 = 1 + K / Q + K * K;
-  const s2 = [1 / a0 * 1, 1 / a0 * -2, 1 / a0 * 1, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0];
-  return [s1, s2];
-}
+// K-weighting (BS.1770): shared high-shelf + RLB high-pass (worklet/dsp-shared.js)
+const { kbiquad, kWeightCoeffs } = TapdeckDSP;
 
 // Fractional-delay windowed-sinc interpolators for inter-sample (true) peak
 // detection: one set of taps per oversampling phase between two real samples.
@@ -67,7 +48,7 @@ function buildInterp(os) {
   return { T, phases };
 }
 
-class LimiterProcessor extends AudioWorkletProcessor {
+class LimiterProcessor extends BaseProcessor {
   constructor() {
     super();
     this.ceiling = -1; this.attack = 0; this.release = 60; this.hold = 5;
@@ -109,22 +90,22 @@ class LimiterProcessor extends AudioWorkletProcessor {
     this.integEL = 0; this.integER = 0; this.integNS = 0;
 
     this.recalc();
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.ceiling === "number") this.ceiling = d.ceiling;
-      if (typeof d.attack === "number") this.attack = d.attack;
-      if (typeof d.release === "number") this.release = d.release;
-      if (typeof d.hold === "number") this.hold = d.hold;
-      if (typeof d.lookahead === "number") this.lookahead = d.lookahead;
-      if (typeof d.inputGain === "number") this.inputGain = d.inputGain;
-      if (typeof d.link === "number") this.link = d.link;
-      if (typeof d.os === "number") this.os = d.os;
-      if (typeof d.style === "string") this.style = d.style;
-      if (typeof d.unity === "boolean") this.unity = d.unity;
-      if (typeof d.dc === "boolean") this.dc = d.dc;
-      if (d.lufsReset) { this.integEL = this.integER = this.integNS = 0; }
-      this.recalc();
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.ceiling === "number") this.ceiling = d.ceiling;
+    if (typeof d.attack === "number") this.attack = d.attack;
+    if (typeof d.release === "number") this.release = d.release;
+    if (typeof d.hold === "number") this.hold = d.hold;
+    if (typeof d.lookahead === "number") this.lookahead = d.lookahead;
+    if (typeof d.inputGain === "number") this.inputGain = d.inputGain;
+    if (typeof d.link === "number") this.link = d.link;
+    if (typeof d.os === "number") this.os = d.os;
+    if (typeof d.style === "string") this.style = d.style;
+    if (typeof d.unity === "boolean") this.unity = d.unity;
+    if (typeof d.dc === "boolean") this.dc = d.dc;
+    if (d.lufsReset) { this.integEL = this.integER = this.integNS = 0; }
+    this.recalc();
   }
 
   makeChan() {
@@ -293,8 +274,8 @@ class LimiterProcessor extends AudioWorkletProcessor {
     if (this.frames >= 512) {
       this.frames = 0;
       const lufsI = this.integNS > 0 ? -0.691 + 10 * Math.log10(this.integEL / this.integNS + this.integER / this.integNS + 1e-12) : -120;
-      this.port.postMessage({
-        type: "meter", gr: this.meterGR, s: this.trace,
+      this.meter({
+        gr: this.meterGR, s: this.trace,
         lufsM: this.windowLufs(4), lufsS: this.windowLufs(30), lufsI,
         peak: 20 * Math.log10(this.peak + 1e-9),
         tp: 20 * Math.log10(this.meterTP + 1e-9),

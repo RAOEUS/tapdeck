@@ -11,11 +11,16 @@ const vm = require("node:vm");
 const ROOT = path.join(__dirname, "..");
 
 function runFile(rel, extraGlobals) {
-  const code = fs.readFileSync(path.join(ROOT, rel), "utf8");
   const ctx = Object.assign({ console, Math, Date }, extraGlobals);
   vm.createContext(ctx);
-  vm.runInContext(code, ctx, { filename: rel });
+  runInto(rel, ctx);
   return ctx;
+}
+// run a file inside an already-created context (lets us load dsp-shared.js
+// before a worklet, the same way offscreen.js addModule's it first)
+function runInto(rel, ctx) {
+  const code = fs.readFileSync(path.join(ROOT, rel), "utf8");
+  vm.runInContext(code, ctx, { filename: rel });
 }
 
 // dsp-math.js assigns window.DSP
@@ -26,12 +31,26 @@ function loadDSP() {
 // load a worklet processor; returns { Processor, ctx, name } (ctx exposes top-level fns too)
 function loadWorklet(file, sampleRate = 48000) {
   let Processor = null, name = null;
-  const ctx = runFile(path.join("worklet", file), {
+  const ctx = Object.assign({ console, Math, Date }, {
     sampleRate,
     AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } },
     registerProcessor: (n, cls) => { Processor = cls; name = n; },
   });
+  vm.createContext(ctx);
+  runInto("worklet/dsp-shared.js", ctx); // shared DSP + BaseProcessor, loaded first
+  runInto(path.join("worklet", file), ctx);
   return { Processor, ctx, name };
+}
+
+// load the shared worklet DSP lib; returns { dsp, BaseProcessor } from its scope
+function loadShared(sampleRate = 48000) {
+  const ctx = Object.assign({ console, Math, Date }, {
+    sampleRate,
+    AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } },
+  });
+  vm.createContext(ctx);
+  runInto("worklet/dsp-shared.js", ctx);
+  return { dsp: ctx.TapdeckDSP, BaseProcessor: ctx.BaseProcessor };
 }
 
 // load the shared module registry (pure data); returns its globals
@@ -86,4 +105,4 @@ function toneMag(blocks, f, sr = 48000, ch = 0, fromBlock = 10) {
   return (2 * Math.sqrt(re * re + im * im)) / Math.max(1, count);
 }
 
-module.exports = { ROOT, loadDSP, loadWorklet, loadRegistry, send, render, rms, peak, toneMag };
+module.exports = { ROOT, loadDSP, loadWorklet, loadShared, loadRegistry, send, render, rms, peak, toneMag };

@@ -8,24 +8,9 @@
 // Params: { target(LUFS), speed(0..100), range(dB), gate(LUFS) }.
 // Posts a scrolling [lufs, gainDb] trace for the display: { type:'meter', s }.
 
-function kbiquad(c, st, x) {
-  const y = c[0] * x + c[1] * st[0] + c[2] * st[1] - c[3] * st[2] - c[4] * st[3];
-  st[1] = st[0]; st[0] = x; st[3] = st[2]; st[2] = y;
-  return y;
-}
-function kWeightCoeffs(sr) {
-  let f0 = 1681.974450955533, G = 3.999843853973347, Q = 0.7071752369554196;
-  let K = Math.tan(Math.PI * f0 / sr);
-  const Vh = Math.pow(10, G / 20), Vb = Math.pow(Vh, 0.4996667741545416);
-  let a0 = 1 + K / Q + K * K;
-  const s1 = [(Vh + Vb * K / Q + K * K) / a0, 2 * (K * K - Vh) / a0, (Vh - Vb * K / Q + K * K) / a0, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0];
-  f0 = 38.13547087602444; Q = 0.5003270373238773;
-  K = Math.tan(Math.PI * f0 / sr); a0 = 1 + K / Q + K * K;
-  const s2 = [1 / a0, -2 / a0, 1 / a0, 2 * (K * K - 1) / a0, (1 - K / Q + K * K) / a0];
-  return [s1, s2];
-}
+const { kbiquad, kWeightCoeffs } = TapdeckDSP; // shared K-weighting (worklet/dsp-shared.js)
 
-class AutoGainProcessor extends AudioWorkletProcessor {
+class AutoGainProcessor extends BaseProcessor {
   constructor() {
     super();
     this.target = -16; this.speed = 50; this.range = 12; this.gate = -45;
@@ -43,15 +28,15 @@ class AutoGainProcessor extends AudioWorkletProcessor {
     this.frames = 0; this.trace = [];
     this.anLeft = 0; this.aid = 0; this.anSum = 0; this.anCount = 0; // integrated-loudness measure
     this.recalc();
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.target === "number") this.target = d.target;
-      if (typeof d.speed === "number") this.speed = d.speed;
-      if (typeof d.range === "number") this.range = d.range;
-      if (typeof d.gate === "number") this.gate = d.gate;
-      if (typeof d.analyze === "number") { this.anLeft = Math.round(d.analyze * sampleRate); this.anSum = 0; this.anCount = 0; }
-      this.recalc();
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.target === "number") this.target = d.target;
+    if (typeof d.speed === "number") this.speed = d.speed;
+    if (typeof d.range === "number") this.range = d.range;
+    if (typeof d.gate === "number") this.gate = d.gate;
+    if (typeof d.analyze === "number") { this.anLeft = Math.round(d.analyze * sampleRate); this.anSum = 0; this.anCount = 0; }
+    this.recalc();
   }
 
   recalc() {
@@ -102,7 +87,7 @@ class AutoGainProcessor extends AudioWorkletProcessor {
     if (this.frames >= 256) {
       this.frames = 0;
       this.trace.push(lufs, this.gainDb);
-      if (this.trace.length >= 16) { this.port.postMessage({ type: "meter", s: this.trace }); this.trace = []; }
+      if (this.trace.length >= 16) { this.meter({ s: this.trace }); this.trace = []; }
     }
 
     if (this.anLeft > 0) { // finish a loudness measurement when its window elapses
@@ -110,7 +95,7 @@ class AutoGainProcessor extends AudioWorkletProcessor {
       if (this.anLeft <= 0) {
         this.aid++;
         const il = this.anCount > 0 ? -0.691 + 10 * Math.log10(this.anSum / this.anCount + 1e-12) : -120;
-        this.port.postMessage({ type: "meter", analysis: { lufs: il, aid: this.aid, n: this.anCount } });
+        this.meter({ analysis: { lufs: il, aid: this.aid, n: this.anCount } });
         this.anSum = 0; this.anCount = 0;
       }
     }

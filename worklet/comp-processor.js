@@ -21,7 +21,7 @@ function hpCoef(f, sr) {
 }
 function biq(co, st, x) { const y = co.b0 * x + co.b1 * st[0] + co.b2 * st[1] - co.a1 * st[2] - co.a2 * st[3]; st[1] = st[0]; st[0] = x; st[3] = st[2]; st[2] = y; return y; }
 
-class CompProcessor extends AudioWorkletProcessor {
+class CompProcessor extends BaseProcessor {
   constructor() {
     super();
     this.threshold = -18;
@@ -46,23 +46,23 @@ class CompProcessor extends AudioWorkletProcessor {
     this.batch = [];      // [level,gain, ...] one pair per render quantum
 
     this.recalc();
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.threshold === "number") this.threshold = d.threshold;
-      if (typeof d.ratio === "number") this.ratio = d.ratio;
-      if (typeof d.attack === "number") this.attack = d.attack;
-      if (typeof d.release === "number") this.release = d.release;
-      if (typeof d.knee === "number") this.knee = d.knee;
-      if (typeof d.makeup === "number") this.makeup = d.makeup;
-      if (typeof d.detector === "string") this.detector = d.detector;
-      if (typeof d.mode === "string") this.mode = d.mode;
-      if (typeof d.range === "number") this.range = d.range;
-      if (typeof d.ratioUp === "number") this.ratioUp = d.ratioUp;
-      if (typeof d.mix === "number") this.mix = d.mix;
-      if (typeof d.scHpf === "number") this.scHpf = d.scHpf;
-      if (typeof d.autoMakeup === "boolean") this.autoMakeup = d.autoMakeup;
-      this.recalc();
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.threshold === "number") this.threshold = d.threshold;
+    if (typeof d.ratio === "number") this.ratio = d.ratio;
+    if (typeof d.attack === "number") this.attack = d.attack;
+    if (typeof d.release === "number") this.release = d.release;
+    if (typeof d.knee === "number") this.knee = d.knee;
+    if (typeof d.makeup === "number") this.makeup = d.makeup;
+    if (typeof d.detector === "string") this.detector = d.detector;
+    if (typeof d.mode === "string") this.mode = d.mode;
+    if (typeof d.range === "number") this.range = d.range;
+    if (typeof d.ratioUp === "number") this.ratioUp = d.ratioUp;
+    if (typeof d.mix === "number") this.mix = d.mix;
+    if (typeof d.scHpf === "number") this.scHpf = d.scHpf;
+    if (typeof d.autoMakeup === "boolean") this.autoMakeup = d.autoMakeup;
+    this.recalc();
   }
 
   recalc() {
@@ -148,7 +148,7 @@ class CompProcessor extends AudioWorkletProcessor {
     // one (level, signed-gain) sample per quantum, sent in small bursts
     this.batch.push(qLevel, qGain);
     if (this.batch.length >= 8) {
-      this.port.postMessage({ type: "meter", s: this.batch });
+      this.meter({ s: this.batch });
       this.batch = [];
     }
     return true;

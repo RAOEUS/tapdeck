@@ -83,7 +83,7 @@ function biquadF(c, st, x) { // direct form I, st = [x1,x2,y1,y2] (for the dynam
   return y;
 }
 
-class EQProcessor extends AudioWorkletProcessor {
+class EQProcessor extends BaseProcessor {
   constructor() {
     super();
     // each band: { target, cur (smoothed coeffs), state: [[x1,x2,y1,y2], ...] }
@@ -97,16 +97,16 @@ class EQProcessor extends AudioWorkletProcessor {
     this.frames = 0;
     this.soloId = null; // id of the band to solo (hear only its change); null = normal
     this.chMode = "stereo"; // stereo | mid | side - which part of the stereo image to EQ
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      let rebuild = false;
-      if (typeof d.preamp === "number") { this.preampDb = d.preamp; rebuild = true; }
-      if (typeof d.mix === "number") { this.mix = d.mix; this.mixF = d.mix * 0.01; rebuild = true; }
-      if (Array.isArray(d.bands)) { this.specs = d.bands; rebuild = true; }
-      if ("soloId" in d) this.soloId = d.soloId;
-      if (typeof d.chMode === "string") this.chMode = d.chMode;
-      if (rebuild) this.setBands(this.specs);
-    };
+  }
+
+  setParams(d) {
+    let rebuild = false;
+    if (typeof d.preamp === "number") { this.preampDb = d.preamp; rebuild = true; }
+    if (typeof d.mix === "number") { this.mix = d.mix; this.mixF = d.mix * 0.01; rebuild = true; }
+    if (Array.isArray(d.bands)) { this.specs = d.bands; rebuild = true; }
+    if ("soloId" in d) this.soloId = d.soloId;
+    if (typeof d.chMode === "string") this.chMode = d.chMode;
+    if (rebuild) this.setBands(this.specs);
   }
 
   setBands(specs) {
@@ -202,7 +202,7 @@ class EQProcessor extends AudioWorkletProcessor {
       if (anyDyn) { // key by band id, not index - the UI band list includes disabled bands this filtered list drops
         const mb = {};
         for (const b of this.bands) if (b.dynMode !== "off") mb[b.id] = b.dynDb;
-        this.port.postMessage({ type: "meter", mb });
+        this.meter({ mb });
       }
     }
 

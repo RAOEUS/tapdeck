@@ -2,7 +2,7 @@
 // channel, and L/R swap. Also meters output stereo correlation + per-channel RMS
 // for a width/balance display. Posts: { type:'meter', corr, rmsL, rmsR }.
 
-class UtilityProcessor extends AudioWorkletProcessor {
+class UtilityProcessor extends BaseProcessor {
   constructor() {
     super();
     this.gain = 0; this.pan = 0; this.width = 1;
@@ -12,18 +12,18 @@ class UtilityProcessor extends AudioWorkletProcessor {
     this.accLL = 0; this.accRR = 0; this.accLR = 0; this.frames = 0;
     this.scope = []; this.scopeStride = 0; // decimated L/R points for the goniometer
     this.recalc();
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.gain === "number") this.gain = d.gain;
-      if (typeof d.pan === "number") this.pan = d.pan;
-      if (typeof d.width === "number") this.width = d.width;
-      if (typeof d.mono === "boolean") this.mono = d.mono;
-      if (typeof d.invL === "boolean") this.invL = d.invL;
-      if (typeof d.invR === "boolean") this.invR = d.invR;
-      if (typeof d.swap === "boolean") this.swap = d.swap;
-      if (typeof d.crossfeed === "number") this.crossfeed = d.crossfeed;
-      this.recalc();
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.gain === "number") this.gain = d.gain;
+    if (typeof d.pan === "number") this.pan = d.pan;
+    if (typeof d.width === "number") this.width = d.width;
+    if (typeof d.mono === "boolean") this.mono = d.mono;
+    if (typeof d.invL === "boolean") this.invL = d.invL;
+    if (typeof d.invR === "boolean") this.invR = d.invR;
+    if (typeof d.swap === "boolean") this.swap = d.swap;
+    if (typeof d.crossfeed === "number") this.crossfeed = d.crossfeed;
+    this.recalc();
   }
 
   recalc() {
@@ -73,7 +73,7 @@ class UtilityProcessor extends AudioWorkletProcessor {
       const denom = Math.sqrt(this.accLL * this.accRR) + 1e-12;
       const corr = this.accLR / denom; // -1..+1
       const rmsL = Math.sqrt(this.accLL / this.frames), rmsR = Math.sqrt(this.accRR / this.frames);
-      this.port.postMessage({ type: "meter", corr, rmsL, rmsR, scope: this.scope });
+      this.meter({ corr, rmsL, rmsR, scope: this.scope });
       this.accLL = this.accRR = this.accLR = 0; this.frames = 0; this.scope = [];
     }
     return true;

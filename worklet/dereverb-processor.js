@@ -10,33 +10,7 @@
 
 const N = 512, HOP = 128, NH = N / 2;
 
-function buildFFT(n) {
-  const levels = Math.round(Math.log2(n));
-  const rev = new Uint32Array(n);
-  for (let i = 0; i < n; i++) { let x = i, r = 0; for (let j = 0; j < levels; j++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r >>> 0; }
-  const cos = new Float32Array(n >> 1), sin = new Float32Array(n >> 1);
-  for (let i = 0; i < (n >> 1); i++) { const a = (-2 * Math.PI * i) / n; cos[i] = Math.cos(a); sin[i] = Math.sin(a); }
-  return { n, rev, cos, sin };
-}
-function fft(p, re, im) {
-  const { n, rev, cos, sin } = p;
-  for (let i = 0; i < n; i++) { const j = rev[i]; if (j > i) { let t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
-  for (let size = 2; size <= n; size <<= 1) {
-    const half = size >> 1, step = n / size;
-    for (let i = 0; i < n; i += size) for (let k = 0, j = 0; k < half; k++, j += step) {
-      const l = i + k, r = l + half, c = cos[j], s = sin[j];
-      const tre = re[r] * c - im[r] * s, tim = re[r] * s + im[r] * c;
-      re[r] = re[l] - tre; im[r] = im[l] - tim; re[l] += tre; im[l] += tim;
-    }
-  }
-}
-function ifft(p, re, im) {
-  const n = p.n;
-  for (let i = 0; i < n; i++) im[i] = -im[i];
-  fft(p, re, im);
-  const s = 1 / n;
-  for (let i = 0; i < n; i++) { re[i] *= s; im[i] = -im[i] * s; }
-}
+const { buildFFT, fft, ifft } = TapdeckDSP; // shared radix-2 FFT (worklet/dsp-shared.js)
 
 class Chan {
   constructor(win, winNorm, fftp) {
@@ -89,7 +63,7 @@ class Chan {
   }
 }
 
-class DereverbProcessor extends AudioWorkletProcessor {
+class DereverbProcessor extends BaseProcessor {
   constructor() {
     super();
     this.amount = 50; this.tail = 300; this.residual = 12; this.mix = 100; this.autoMakeup = true;
@@ -103,15 +77,15 @@ class DereverbProcessor extends AudioWorkletProcessor {
     this.trace = [];
     // auto-analysis: estimate the room's reverb decay from falling-envelope slopes
     this.anLeft = 0; this.aid = 0; this.slopes = []; this.peakHold = -120; this.prevDb = -120;
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.amount === "number") this.amount = d.amount;
-      if (typeof d.tail === "number") this.tail = d.tail;
-      if (typeof d.residual === "number") this.residual = d.residual;
-      if (typeof d.mix === "number") this.mix = d.mix;
-      if (typeof d.autoMakeup === "boolean") this.autoMakeup = d.autoMakeup;
-      if (typeof d.analyze === "number") { this.anLeft = Math.round(d.analyze * sampleRate); this.slopes = []; this.peakHold = -120; this.prevDb = -120; }
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.amount === "number") this.amount = d.amount;
+    if (typeof d.tail === "number") this.tail = d.tail;
+    if (typeof d.residual === "number") this.residual = d.residual;
+    if (typeof d.mix === "number") this.mix = d.mix;
+    if (typeof d.autoMakeup === "boolean") this.autoMakeup = d.autoMakeup;
+    if (typeof d.analyze === "number") { this.anLeft = Math.round(d.analyze * sampleRate); this.slopes = []; this.peakHold = -120; this.prevDb = -120; }
   }
 
   // collect the decay rate (dB/s) of falling tails this quantum; when the window
@@ -141,7 +115,7 @@ class DereverbProcessor extends AudioWorkletProcessor {
         amount = Math.round(Math.min(60, Math.max(30, 28 + rt60 * 20)));
         residual = Math.round(Math.min(20, Math.max(10, 19 - rt60 * 3)));
       }
-      this.port.postMessage({ type: "meter", analysis: { tail, amount, residual, aid: this.aid, n: nslopes } });
+      this.meter({ analysis: { tail, amount, residual, aid: this.aid, n: nslopes } });
       this.slopes = [];
     }
   }
@@ -180,7 +154,7 @@ class DereverbProcessor extends AudioWorkletProcessor {
 
     this.dispEnv = inPeak > this.dispEnv ? inPeak : inPeak + (this.dispEnv - inPeak) * this.dispRel;
     this.trace.push(20 * Math.log10(this.dispEnv + 1e-9), Math.max(0, redDb));
-    if (this.trace.length >= 16) { this.port.postMessage({ type: "meter", s: this.trace }); this.trace = []; }
+    if (this.trace.length >= 16) { this.meter({ s: this.trace }); this.trace = []; }
 
     if (this.anLeft > 0) this.analyze(input, n, chans);
     return true;

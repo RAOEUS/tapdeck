@@ -37,7 +37,7 @@ function butterworth(type, fc, sr) {
   return { b0: b0 / a0, b1: b1 / a0, b2: b2 / a0, a1: a1 / a0, a2: a2 / a0 };
 }
 
-class MBCompProcessor extends AudioWorkletProcessor {
+class MBCompProcessor extends BaseProcessor {
   constructor() {
     super();
     this.xovers = [250, 2500];
@@ -45,14 +45,14 @@ class MBCompProcessor extends AudioWorkletProcessor {
     this.mix = 100; // dry/wet (%) - parallel multiband
     this.frames = 0;
     this.build();
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.mix === "number") this.mix = d.mix; // mix is not structural - no rebuild
-      let structural = false;
-      if (Array.isArray(d.xovers)) { this.xovers = d.xovers.slice(); structural = true; }
-      if (Array.isArray(d.bands)) { this.bandParams = d.bands.map((b) => ({ ...b })); structural = true; }
-      if (structural) this.build();
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.mix === "number") this.mix = d.mix; // mix is not structural - no rebuild
+    let structural = false;
+    if (Array.isArray(d.xovers)) { this.xovers = d.xovers.slice(); structural = true; }
+    if (Array.isArray(d.bands)) { this.bandParams = d.bands.map((b) => ({ ...b })); structural = true; }
+    if (structural) this.build();
   }
 
   build() {
@@ -166,7 +166,7 @@ class MBCompProcessor extends AudioWorkletProcessor {
     this.frames += n;
     if (this.frames >= 256) {
       this.frames = 0;
-      this.port.postMessage({ type: "meter", mb: this.bands.map((b) => [b.meterDown, b.meterUp]) });
+      this.meter({ mb: this.bands.map((b) => [b.meterDown, b.meterUp]) });
       for (const b of this.bands) { b.meterDown *= 0.6; b.meterUp *= 0.6; }
     }
     return true;

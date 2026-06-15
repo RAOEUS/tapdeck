@@ -29,7 +29,7 @@ function buildOS(os) {
   return { os, taps, subLen, h, up };
 }
 
-class SatProcessor extends AudioWorkletProcessor {
+class SatProcessor extends BaseProcessor {
   constructor() {
     super();
     this.drive = 0; this.mode = "tube"; this.tone = 0; this.mix = 100; this.output = 0; this.os = 1;
@@ -37,16 +37,16 @@ class SatProcessor extends AudioWorkletProcessor {
     this.frames = 0; this.peak = 0;
     this.osF = null; this.osState = [null, null]; this._osN = 1;
     this.recalc();
-    this.port.onmessage = (e) => {
-      const d = e.data || {};
-      if (typeof d.drive === "number") this.drive = d.drive;
-      if (typeof d.mode === "string") this.mode = d.mode;
-      if (typeof d.tone === "number") this.tone = d.tone;
-      if (typeof d.mix === "number") this.mix = d.mix;
-      if (typeof d.output === "number") this.output = d.output;
-      if (typeof d.os === "number") this.os = d.os;
-      this.recalc();
-    };
+  }
+
+  setParams(d) {
+    if (typeof d.drive === "number") this.drive = d.drive;
+    if (typeof d.mode === "string") this.mode = d.mode;
+    if (typeof d.tone === "number") this.tone = d.tone;
+    if (typeof d.mix === "number") this.mix = d.mix;
+    if (typeof d.output === "number") this.output = d.output;
+    if (typeof d.os === "number") this.os = d.os;
+    this.recalc();
   }
 
   makeOSState() {
@@ -124,7 +124,7 @@ class SatProcessor extends AudioWorkletProcessor {
     this.frames += n;
     if (this.frames >= 1024) {
       this.frames = 0;
-      this.port.postMessage({ type: "meter", level: 20 * Math.log10(this.peak + 1e-9) });
+      this.meter({ level: 20 * Math.log10(this.peak + 1e-9) });
       this.peak *= 0.4;
     }
     return true;
