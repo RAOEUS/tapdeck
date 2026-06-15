@@ -1338,6 +1338,7 @@ function renderLimiter(m) {
         <div class="lufs-cell"><div class="lufs-k">Short-term</div><div class="lufs-v" id="lufsS">-</div></div>
         <div class="lufs-cell"><div class="lufs-k">Integrated</div><div class="lufs-v" id="lufsI">-</div></div>
         <div class="lufs-cell"><div class="lufs-k">Peak (dBFS)</div><div class="lufs-v" id="lufsPk">-</div></div>
+        <div class="lufs-cell"><div class="lufs-k">True peak (dBTP)</div><div class="lufs-v" id="lufsTP">-</div></div>
       </div>
     </div>`;
   wireKnobs(m, lKnobs.map((k) => k[0]));
@@ -1357,7 +1358,7 @@ function renderLimiter(m) {
   const dims = makeCanvas(canvas, 0.5);
   const ctx = canvas.getContext("2d");
   const grFill = document.getElementById("grFill"), grVal = document.getElementById("grVal"), grPk = document.getElementById("grPk");
-  const elM = document.getElementById("lufsM"), elS = document.getElementById("lufsS"), elI = document.getElementById("lufsI"), elPk = document.getElementById("lufsPk");
+  const elM = document.getElementById("lufsM"), elS = document.getElementById("lufsS"), elI = document.getElementById("lufsI"), elPk = document.getElementById("lufsPk"), elTP = document.getElementById("lufsTP");
   const fmtL = (v) => (typeof v === "number" && v > -120 ? v.toFixed(1) : "-");
 
   // zoom = visible time window (ms) across the canvas width, set by the slider or
@@ -1456,6 +1457,7 @@ function renderLimiter(m) {
     grPk.textContent = "pk " + grHold.toFixed(1);
     elM.textContent = fmtL(me.lufsM); elS.textContent = fmtL(me.lufsS); elI.textContent = fmtL(me.lufsI);
     elPk.textContent = typeof me.peak === "number" && me.peak > -120 ? me.peak.toFixed(1) : "-";
+    if (elTP) { elTP.textContent = typeof me.tp === "number" && me.tp > -120 ? me.tp.toFixed(1) : "-"; elTP.style.color = (typeof me.tp === "number" && me.tp > m.ceiling + 0.05) ? "var(--danger)" : ""; }
   };
 }
 

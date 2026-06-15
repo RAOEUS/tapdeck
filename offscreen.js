@@ -279,8 +279,9 @@ function makeNode(s, type) {
       for (let i = 0; i < d.s.length; i += 2) m.traceQ.push([d.s[i], d.s[i + 1]]);
       if (m.traceQ.length > 800) m.traceQ.splice(0, m.traceQ.length - 800);
       m.level = d.s[d.s.length - 2]; m.gr = d.s[d.s.length - 1];
-      // the limiter ships its LUFS alongside the trace, so read it here too
+      // the limiter ships its LUFS + true-peak alongside the trace, so read them here too
       if (typeof d.lufsM === "number") { m.lufsM = d.lufsM; m.lufsS = d.lufsS; m.lufsI = d.lufsI; m.peak = d.peak; }
+      if (typeof d.tp === "number") m.tp = d.tp;
     } else {
       if (typeof d.gr === "number") m.gr = d.gr;
       if (typeof d.level === "number") m.level = d.level;
@@ -362,7 +363,7 @@ function poll(tabId) {
       gr: m.gr || 0, level: m.level, trace: m.traceQ && m.traceQ.length ? m.traceQ : null,
       mb: m.mb, corr: m.corr, rmsL: m.rmsL, rmsR: m.rmsR,
       scope: m.scopeQ && m.scopeQ.length ? m.scopeQ : null,
-      lufsM: m.lufsM, lufsS: m.lufsS, lufsI: m.lufsI, peak: m.peak,
+      lufsM: m.lufsM, lufsS: m.lufsS, lufsI: m.lufsI, peak: m.peak, tp: m.tp,
     };
     if (m.traceQ) m.traceQ = []; // hand over and clear, like the spectrogram columns
     if (m.scopeQ) m.scopeQ = [];

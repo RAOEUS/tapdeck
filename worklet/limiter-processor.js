@@ -93,6 +93,13 @@ class LimiterProcessor extends AudioWorkletProcessor {
     // audio cycle (looks "wiggly"); a peak envelope reads as clean mountains.
     this.dispEnv = 0; this.dispRel = Math.exp(-1 / (0.035 * sampleRate)); // ~35 ms release
 
+    // True-peak meter: always 4x, independent of the limiting oversampling. Measures
+    // the inter-sample peak of the OUTPUT, so it shows whether the reconstructed
+    // signal actually stays under the ceiling (i.e. whether oversampling is needed).
+    this.tpInterp = buildInterp(4);
+    this.tpBuf = [new Float32Array(this.tpInterp.T), new Float32Array(this.tpInterp.T)];
+    this.tpPos = 0; this.meterTP = 0;
+
     // LUFS state
     [this.kw1, this.kw2] = kWeightCoeffs(sampleRate);
     this.kSt = [[[0, 0, 0, 0], [0, 0, 0, 0]], [[0, 0, 0, 0], [0, 0, 0, 0]]]; // [ch][stage]
@@ -151,6 +158,20 @@ class LimiterProcessor extends AudioWorkletProcessor {
         for (let k = 0; k < T; k++) acc += h[k] * buf[(base + k) % md];
         const a = Math.abs(acc); if (a > mx) mx = a;
       }
+    }
+    return mx;
+  }
+
+  // inter-sample (true) peak of one output sample, written into its channel ring
+  outTruePeak(ch, sample) {
+    const ip = this.tpInterp, T = ip.T, buf = this.tpBuf[ch];
+    buf[this.tpPos] = sample;
+    let mx = Math.abs(sample);
+    const base = this.tpPos - (T - 1) + T * 4; // keep index positive before %
+    for (let pi = 0; pi < ip.phases.length; pi++) {
+      const h = ip.phases[pi]; let acc = 0;
+      for (let k = 0; k < T; k++) acc += h[k] * buf[(base + k) % T];
+      const a = Math.abs(acc); if (a > mx) mx = a;
     }
     return mx;
   }
@@ -233,6 +254,10 @@ class LimiterProcessor extends AudioWorkletProcessor {
 
       const ap = Math.abs(oL) > Math.abs(oR) ? Math.abs(oL) : Math.abs(oR);
       if (ap > this.peak) this.peak = ap;
+      const tpL = this.outTruePeak(0, oL), tpR = this.outTruePeak(1, oR); // inter-sample (true) peak of the output
+      const tpMax = tpL > tpR ? tpL : tpR;
+      if (tpMax > this.meterTP) this.meterTP = tpMax;
+      this.tpPos = this.tpPos + 1 === this.tpInterp.T ? 0 : this.tpPos + 1;
       const gMin = gL < gR ? gL : gR;
       const grDb = -20 * Math.log10(gMin + 1e-9);
       if (grDb > this.meterGR) this.meterGR = grDb;
@@ -272,9 +297,10 @@ class LimiterProcessor extends AudioWorkletProcessor {
         type: "meter", gr: this.meterGR, s: this.trace,
         lufsM: this.windowLufs(4), lufsS: this.windowLufs(30), lufsI,
         peak: 20 * Math.log10(this.peak + 1e-9),
+        tp: 20 * Math.log10(this.meterTP + 1e-9),
       });
       this.trace = [];
-      this.meterGR *= 0.6; this.peak *= 0.5;
+      this.meterGR *= 0.6; this.peak *= 0.5; this.meterTP *= 0.5;
     }
     return true;
   }
