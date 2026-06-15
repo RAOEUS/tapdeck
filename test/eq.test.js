@@ -46,6 +46,30 @@ test("EQ dynamic-gain meter is keyed by band id (survives a disabled earlier ban
   assert.ok("b2" in mb, "the dynamic band must be reported under its id, not a filtered index");
 });
 
+test("EQ in Side mode leaves the Mid (mono sum) unchanged but alters the Side", () => {
+  const { Processor } = loadWorklet("eq-processor.js");
+  const p = new Processor();
+  send(p, bands({ id: "b1", type: "peaking", freq: 2000, gain: 12, q: 1, enabled: true }));
+  send(p, { chMode: "side" });
+  // distinct L/R so there's a real Side component (L tone at 2k, R tone at 500)
+  const sig = (t, c) => 0.2 * Math.sin((2 * Math.PI * (c === 0 ? 2000 : 500) * t) / SR);
+  const blocks = render(p, sig, { blocks: 200, chans: 2 });
+  let midErr = 0, sideDelta = 0, count = 0;
+  const n = blocks[0][0].length;
+  for (let b = 120; b < blocks.length; b++) {
+    const L = blocks[b][0], R = blocks[b][1];
+    for (let i = 0; i < n; i++) {
+      const t = b * n + i;
+      const inL = 0.2 * Math.sin((2 * Math.PI * 2000 * t) / SR), inR = 0.2 * Math.sin((2 * Math.PI * 500 * t) / SR);
+      midErr += Math.abs((L[i] + R[i]) - (inL + inR));   // mid should be untouched
+      sideDelta += Math.abs((L[i] - R[i]) - (inL - inR)); // side should change (2k boosted)
+      count++;
+    }
+  }
+  assert.ok(midErr / count < 1e-3, `Side mode must not change the Mid: err ${midErr / count}`);
+  assert.ok(sideDelta / count > 1e-2, "Side mode should change the Side signal");
+});
+
 test("EQ peaking boost raises the level at its frequency", () => {
   const { Processor } = loadWorklet("eq-processor.js");
   const p = new Processor();

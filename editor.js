@@ -92,12 +92,12 @@ const rack = () => (selectedTab != null ? racks[selectedTab] : null);
 // ---------- defaults ----------
 function defaultModule(type) {
   const base = { id: nid(), type, bypass: false };
-  if (type === "eq") return { ...base, name: "EQ", preamp: 0, mix: 100, bands: [
+  if (type === "eq") return { ...base, name: "EQ", preamp: 0, mix: 100, chMode: "stereo", bands: [
     { id: nid(), type: "peaking", freq: 120, gain: 0, q: 1, enabled: true },
     { id: nid(), type: "peaking", freq: 1000, gain: 0, q: 1, enabled: true },
     { id: nid(), type: "peaking", freq: 6000, gain: 0, q: 1, enabled: true },
   ] };
-  if (type === "comp") return { ...base, name: "Compressor", threshold: -18, ratio: 4, ratioUp: 4, attack: 10, release: 120, knee: 6, makeup: 0, detector: "feedforward", mode: "down", range: 24, mix: 100 };
+  if (type === "comp") return { ...base, name: "Compressor", threshold: -18, ratio: 4, ratioUp: 4, attack: 10, release: 120, knee: 6, makeup: 0, detector: "feedforward", mode: "down", range: 24, mix: 100, scHpf: 20 };
   if (type === "limiter") return { ...base, name: "Limiter", inputGain: 0, ceiling: -1, attack: 0, release: 60, hold: 5, lookahead: 5, link: 100, os: 1, style: "transparent", unity: false, dc: false, zoom: 1000 };
   if (type === "utility") return { ...base, name: "Utility", gain: 0, pan: 0, width: 1, mono: false, invL: false, invR: false, swap: false, crossfeed: 0 };
   if (type === "sat") return { ...base, name: "Saturator", drive: 6, mode: "tube", tone: 0, mix: 100, output: 0, os: 2 };
@@ -115,8 +115,8 @@ function defaultModule(type) {
 
 // ---------- messaging to engine ----------
 function paramsFor(m) {
-  if (m.type === "eq") return { bands: m.bands, preamp: m.preamp || 0, mix: m.mix ?? 100 };
-  if (m.type === "comp") return { threshold: m.threshold, ratio: m.ratio, ratioUp: m.ratioUp, attack: m.attack, release: m.release, knee: m.knee, makeup: m.makeup, detector: m.detector, mode: m.mode, range: m.range, mix: m.mix };
+  if (m.type === "eq") return { bands: m.bands, preamp: m.preamp || 0, mix: m.mix ?? 100, chMode: m.chMode || "stereo" };
+  if (m.type === "comp") return { threshold: m.threshold, ratio: m.ratio, ratioUp: m.ratioUp, attack: m.attack, release: m.release, knee: m.knee, makeup: m.makeup, detector: m.detector, mode: m.mode, range: m.range, mix: m.mix, scHpf: m.scHpf };
   if (m.type === "limiter") return { inputGain: m.inputGain, ceiling: m.ceiling, attack: m.attack, release: m.release, hold: m.hold, lookahead: m.lookahead, link: m.link, os: m.os, style: m.style, unity: m.unity, dc: m.dc };
   if (m.type === "utility") return { gain: m.gain, pan: m.pan, width: m.width, mono: m.mono, invL: m.invL, invR: m.invR, swap: m.swap, crossfeed: m.crossfeed || 0 };
   if (m.type === "mbcomp") return { xovers: m.xovers, bands: m.bands, mix: m.mix };
@@ -694,8 +694,10 @@ function edHead(title, tag, controls) {
 function renderEQ(m) {
   m.sel = (m.sel != null && m.sel < m.bands.length) ? m.sel : 0;
   m.mix = m.mix ?? 100;
+  m.chMode = m.chMode || "stereo";
+  const chModeSel = `<label class="detsel" title="Apply the EQ to the whole stereo image, the Mid (centre / mono) only, or the Side (stereo difference) only.">Process <select id="eqChMode">${[["stereo", "Stereo"], ["mid", "Mid"], ["side", "Side"]].map(([v, l]) => `<option value="${v}" ${m.chMode === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>`;
   edEl.innerHTML = `
-    ${edHead(m.name, "Parametric EQ", `<button id="eqSolo" class="ed-toggle" title="Solo the selected band — hear exactly the change it makes (the band, phase-cancelled against the dry signal)">Solo band</button>`)}
+    ${edHead(m.name, "Parametric EQ", `${chModeSel}<button id="eqSolo" class="ed-toggle" title="Solo the selected band — hear exactly the change it makes (the band, phase-cancelled against the dry signal)">Solo band</button>`)}
     <div class="graphwrap"><canvas id="eqCanvas"></canvas></div>
     <div class="toolbar">
       <label>Range <select id="eqRange"><option>12</option><option selected>24</option><option>36</option></select> dB</label>
@@ -731,6 +733,7 @@ function renderEQ(m) {
   const soloBtn = document.getElementById("eqSolo");
   soloBtn.addEventListener("click", () => { soloOn = !soloOn; soloBtn.classList.toggle("on", soloOn); pushSolo(); });
   pushSolo(); // clear any stale solo in the worklet on (re)entry
+  document.getElementById("eqChMode").addEventListener("change", (e) => { m.chMode = e.target.value; pushParam(m); save(); });
   const preampEl = document.getElementById("eqPreamp");
   preampEl.addEventListener("input", () => { if (preampEl.value === "") return; m.preamp = clamp(+preampEl.value, -24, 24); pushParam(m); save(); });
   const mixEl = document.getElementById("eqMix");
@@ -1051,7 +1054,7 @@ function renderEQ(m) {
 
 // ===================== Compressor =====================
 function renderComp(m) {
-  m.mode = m.mode || "down"; m.range = m.range ?? 24; m.mix = m.mix ?? 100; m.ratioUp = m.ratioUp ?? m.ratio;
+  m.mode = m.mode || "down"; m.range = m.range ?? 24; m.mix = m.mix ?? 100; m.ratioUp = m.ratioUp ?? m.ratio; m.scHpf = m.scHpf ?? 20;
   // OTT exposes independent down/up ratios; "Range" becomes the upward depth limit
   const isOtt = m.mode === "ott", upMode = isOtt || m.mode === "up";
   const cKnobs = [
@@ -1064,6 +1067,7 @@ function renderComp(m) {
     ["makeup", knob("makeup", "Makeup", m.makeup, 0, 24, 0.5, "dB")],
     ["range", knob("range", upMode ? "Up depth" : "Range", m.range, 0, 48, 1, "dB")],
     ["mix", knob("mix", "Dry/Wet", m.mix, 0, 100, 1, "%")],
+    ["scHpf", knob("scHpf", "SC HPF", m.scHpf, 20, 500, 1, "Hz")],
   ];
   edEl.innerHTML = `
     ${edHead(m.name, "Compressor", `

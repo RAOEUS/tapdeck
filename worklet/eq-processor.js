@@ -96,6 +96,7 @@ class EQProcessor extends AudioWorkletProcessor {
     this.detRel = Math.exp(-1 / (0.05 * sampleRate));  // 50 ms release
     this.frames = 0;
     this.soloId = null; // id of the band to solo (hear only its change); null = normal
+    this.chMode = "stereo"; // stereo | mid | side — which part of the stereo image to EQ
     this.port.onmessage = (e) => {
       const d = e.data || {};
       let rebuild = false;
@@ -103,6 +104,7 @@ class EQProcessor extends AudioWorkletProcessor {
       if (typeof d.mix === "number") { this.mix = d.mix; this.mixF = d.mix * 0.01; rebuild = true; }
       if (Array.isArray(d.bands)) { this.specs = d.bands; rebuild = true; }
       if ("soloId" in d) this.soloId = d.soloId;
+      if (typeof d.chMode === "string") this.chMode = d.chMode;
       if (rebuild) this.setBands(this.specs);
     };
   }
@@ -146,6 +148,13 @@ class EQProcessor extends AudioWorkletProcessor {
     const a = this.smoothA;
     for (let ch = 0; ch < chans; ch++) output[ch].set(input[ch]); // cascade runs in place
 
+    // mid/side: encode L/R -> M/S and process only the targeted channel, passing the
+    // other through; decode back at the end. (stereo = process both, no transform.)
+    const ms = (this.chMode === "mid" || this.chMode === "side") && chans === 2;
+    const tgt = this.chMode === "side" ? 1 : 0; // M -> output[0], S -> output[1]
+    if (ms) for (let i = 0; i < n; i++) { const l = output[0][i], r = output[1][i]; output[0][i] = 0.5 * (l + r); output[1][i] = 0.5 * (l - r); }
+    const pc = ms ? [tgt] : (chans === 1 ? [0] : [0, 1]); // channels the cascade touches
+
     // band solo: find the soloed band in the live cascade. We capture its exact
     // in/out difference during the cascade below (phase cancellation), so the solo
     // reflects everything the band actually does — including dynamic-EQ movement
@@ -167,7 +176,7 @@ class EQProcessor extends AudioWorkletProcessor {
       anyDyn = true;
       const ds = band.detState;
       for (let i = 0; i < n; i++) {
-        const x = Math.abs(biquadF(band.det, ds, 0.5 * (L[i] + R[i])));
+        const x = Math.abs(biquadF(band.det, ds, ms ? output[tgt][i] : 0.5 * (L[i] + R[i])));
         band.env = x > band.env ? x + (band.env - x) * this.detAtk : x + (band.env - x) * this.detRel;
         const over = 20 * Math.log10(band.env + 1e-9) - band.dynThr;
         let tgt;
@@ -198,18 +207,18 @@ class EQProcessor extends AudioWorkletProcessor {
     }
 
     for (let bi = 0; bi < this.bands.length; bi++) {
-      if (bi === soloIdx) for (let ch = 0; ch < chans; ch++) this.preBuf[ch].set(output[ch]); // signal entering this band
+      if (bi === soloIdx) for (const ch of pc) this.preBuf[ch].set(output[ch]); // signal entering this band
       const sections = this.bands[bi].sections;
       for (let si = 0; si < sections.length; si++) {
         const sec = sections[si], c = sec.cur, t = sec.target;
-        for (let ch = 0; ch < chans; ch++) if (!sec.state[ch]) sec.state[ch] = [0, 0, 0, 0];
+        for (const ch of pc) if (!sec.state[ch]) sec.state[ch] = [0, 0, 0, 0];
 
         for (let i = 0; i < n; i++) {
           // ramp coefficients toward target once per sample, shared across channels
           c.b0 += (t.b0 - c.b0) * a; c.b1 += (t.b1 - c.b1) * a; c.b2 += (t.b2 - c.b2) * a;
           c.a1 += (t.a1 - c.a1) * a; c.a2 += (t.a2 - c.a2) * a;
 
-          for (let ch = 0; ch < chans; ch++) {
+          for (const ch of pc) {
             const s = sec.state[ch];
             const xn = output[ch][i];
             const yn = c.b0 * xn + c.b1 * s[0] + c.b2 * s[1] - c.a1 * s[2] - c.a2 * s[3];
@@ -219,10 +228,13 @@ class EQProcessor extends AudioWorkletProcessor {
         }
       }
       if (bi === soloIdx) { // solo: output only this band's change (post − pre), then stop
-        for (let ch = 0; ch < chans; ch++) { const o = output[ch], p = this.preBuf[ch]; for (let i = 0; i < n; i++) o[i] -= p[i]; }
+        for (const ch of pc) { const o = output[ch], p = this.preBuf[ch]; for (let i = 0; i < n; i++) o[i] -= p[i]; }
+        if (ms) { output[tgt === 0 ? 1 : 0].fill(0); for (let i = 0; i < n; i++) { const m0 = output[0][i], s0 = output[1][i]; output[0][i] = m0 + s0; output[1][i] = m0 - s0; } }
         return true;
       }
     }
+
+    if (ms) for (let i = 0; i < n; i++) { const m0 = output[0][i], s0 = output[1][i]; output[0][i] = m0 + s0; output[1][i] = m0 - s0; } // decode M/S -> L/R
 
     if (this.preampLin !== 1) {
       for (let ch = 0; ch < chans; ch++) { const o = output[ch]; for (let i = 0; i < n; i++) o[i] *= this.preampLin; }
