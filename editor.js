@@ -234,19 +234,59 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove("show"), 1400);
 }
 
-// single-level undo: snapshot the current tab's rack before a destructive change
-let undoSnapshot = null;
-function pushUndo() {
-  if (selectedTab != null && racks[selectedTab]) undoSnapshot = { tabId: selectedTab, json: JSON.stringify(racks[selectedTab]) };
-}
+// multi-level undo/redo: bounded stacks of whole-rack snapshots (tagged by tab)
+const undoStack = [], redoStack = [], UNDO_MAX = 80;
+function snapshot() { return selectedTab != null && racks[selectedTab] ? { tabId: selectedTab, json: JSON.stringify(racks[selectedTab]) } : null; }
+function pushUndo() { const s = snapshot(); if (!s) return; undoStack.push(s); if (undoStack.length > UNDO_MAX) undoStack.shift(); redoStack.length = 0; }
+function restoreSnap(snap) { racks[snap.tabId] = JSON.parse(snap.json); selectedTab = snap.tabId; sigView = selectedTab; commit(); }
 function doUndo() {
-  if (!undoSnapshot || !racks[undoSnapshot.tabId]) { toast("Nothing to undo"); return; }
-  const { tabId, json } = undoSnapshot;
-  racks[tabId] = JSON.parse(json);
-  undoSnapshot = null;
-  selectedTab = tabId; sigView = selectedTab;
+  if (!undoStack.length) { toast("Nothing to undo"); return; }
+  const cur = snapshot(); if (cur) redoStack.push(cur);
+  restoreSnap(undoStack.pop());
+  toast("Undo");
+}
+function doRedo() {
+  if (!redoStack.length) { toast("Nothing to redo"); return; }
+  const cur = snapshot(); if (cur) undoStack.push(cur);
+  restoreSnap(redoStack.pop());
+  toast("Redo");
+}
+
+// deep-clone one module with fresh ids (module + any band ids)
+function cloneModule(m) {
+  const nm = JSON.parse(JSON.stringify(m));
+  nm.id = nid();
+  if (nm.bands) nm.bands = nm.bands.map((b) => ({ ...b, id: nid() }));
+  return nm;
+}
+function duplicateModule(id) {
+  const r = rack(); if (!r) return;
+  const idx = r.modules.findIndex((x) => x.id === id); if (idx < 0) return;
+  pushUndo();
+  const clone = cloneModule(r.modules[idx]);
+  r.modules.splice(idx + 1, 0, clone);
+  r.selected = clone.id;
   commit();
-  toast("Undid last change");
+  toast(`Duplicated ${clone.name}`);
+}
+let moduleClipboard = null; // JSON of a copied module (paste clones it, even across tabs)
+function copyModule(id) {
+  const r = rack(); const m = r && r.modules.find((x) => x.id === id);
+  if (!m) return;
+  moduleClipboard = JSON.stringify(m);
+  toast(`Copied ${m.name}`);
+}
+function pasteModule() {
+  const r = rack();
+  if (!r) return;
+  if (!moduleClipboard) { toast("Nothing to paste"); return; }
+  pushUndo();
+  const clone = cloneModule(JSON.parse(moduleClipboard));
+  const idx = r.modules.findIndex((x) => x.id === r.selected);
+  r.modules.splice(idx >= 0 ? idx + 1 : r.modules.length, 0, clone);
+  r.selected = clone.id;
+  commit();
+  toast(`Pasted ${clone.name}`);
 }
 
 // modules array for a preset name, from either source
@@ -515,6 +555,7 @@ function renderRack() {
       ${canBypass ? `<button class="pwr ${m.bypass ? "" : "on"}" title="Bypass">${m.bypass ? "○" : "●"}</button>` : `<span class="pwr ghost">◍</span>`}
       <span class="name">${m.name}</span>
       <span class="tag">${TAGS[m.type] || m.type}</span>
+      <button class="dup" title="Duplicate">⧉</button>
       <button class="del" title="Remove">✕</button>`;
 
     li.addEventListener("click", (e) => {
@@ -522,6 +563,7 @@ function renderRack() {
       r.selected = m.id; commit({ structure: false });
     });
     if (canBypass) li.querySelector(".pwr").addEventListener("click", () => { m.bypass = !m.bypass; commit(); });
+    li.querySelector(".dup").addEventListener("click", () => duplicateModule(m.id));
     li.querySelector(".del").addEventListener("click", () => removeModule(m.id));
 
     // drag and drop
@@ -2437,11 +2479,18 @@ document.getElementById("setDefault").addEventListener("click", (e) => {
 // app-level keyboard shortcuts (ignored while typing in a field)
 document.addEventListener("keydown", (e) => {
   const t = e.target, typing = t && (t.tagName === "INPUT" || t.tagName === "SELECT" || t.tagName === "TEXTAREA" || t.isContentEditable);
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); doUndo(); return; }
+  const mod = e.ctrlKey || e.metaKey, k = e.key.toLowerCase();
+  if (mod && k === "z" && !e.shiftKey) { e.preventDefault(); doUndo(); return; }
+  if (mod && (k === "y" || (k === "z" && e.shiftKey))) { e.preventDefault(); doRedo(); return; }
   if (typing) return;
+  const r = rack(), sel = r && r.modules.find((x) => x.id === r.selected);
+  if (mod && k === "d") { if (sel) { e.preventDefault(); duplicateModule(sel.id); } return; }
+  // copy/paste a module across the rack/tabs — only when no text is selected, so it
+  // doesn't steal a real text copy
+  if (mod && k === "c" && !String(window.getSelection())) { if (sel) { e.preventDefault(); copyModule(sel.id); } return; }
+  if (mod && k === "v" && !String(window.getSelection())) { if (r) { e.preventDefault(); pasteModule(); } return; }
   if (e.key === "Delete" || e.key === "Backspace") {
-    const r = rack(); const m = r && r.modules.find((x) => x.id === r.selected);
-    if (m) { e.preventDefault(); removeModule(m.id); toast(`Removed ${m.name} - Ctrl+Z to undo`); }
+    if (sel) { e.preventDefault(); removeModule(sel.id); toast(`Removed ${sel.name} - Ctrl+Z to undo`); }
   }
 });
 

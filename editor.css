@@ -120,6 +120,7 @@ body {
 .module-item button { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 13px; padding: 2px 4px; border-radius: 4px; }
 .module-item button:hover { color: var(--text); background: rgba(255,255,255,.06); }
 .module-item .del:hover { color: var(--danger); }
+.module-item .dup:hover { color: var(--accent); }
 .module-item .pwr.on { color: var(--accent); }
 .module-item .pwr.ghost { color: #3a424e; }
 
