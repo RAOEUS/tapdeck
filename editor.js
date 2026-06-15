@@ -104,7 +104,7 @@ function defaultModule(type) {
   if (type === "trans") return { ...base, name: "Transient", attack: 0, sustain: 0, output: 0 };
   if (type === "gate") return { ...base, name: "Gate", threshold: -45, ratio: 4, range: 50, attack: 1, release: 120, hold: 12 };
   if (type === "denoise") return { ...base, name: "Denoise", amount: 60, floor: 6 };
-  if (type === "dereverb") return { ...base, name: "De-reverb", amount: 50, tail: 300, residual: 12, mix: 100 };
+  if (type === "dereverb") return { ...base, name: "De-reverb", amount: 50, tail: 300, residual: 12, mix: 100, autoMakeup: true };
   if (type === "mbcomp") return { ...base, name: "Multiband", selBand: 0, mix: 100, xovers: [250, 2500], bands: [
     { threshold: -24, ratio: 3, attack: 15, release: 150, knee: 6, makeup: 0, bypass: false, detector: "feedforward", mode: "down", range: 24 },
     { threshold: -22, ratio: 3, attack: 10, release: 120, knee: 6, makeup: 0, bypass: false, detector: "feedforward", mode: "down", range: 24 },
@@ -125,7 +125,7 @@ function paramsFor(m) {
   if (m.type === "trans") return { attack: m.attack, sustain: m.sustain, output: m.output };
   if (m.type === "gate") return { threshold: m.threshold, ratio: m.ratio, range: m.range, attack: m.attack, release: m.release, hold: m.hold };
   if (m.type === "denoise") return { amount: m.amount, floor: m.floor };
-  if (m.type === "dereverb") return { amount: m.amount, tail: m.tail, residual: m.residual, mix: m.mix };
+  if (m.type === "dereverb") return { amount: m.amount, tail: m.tail, residual: m.residual, mix: m.mix, autoMakeup: m.autoMakeup };
   return {}; // analyzer has nothing to send
 }
 function send(msg) { try { chrome.runtime.sendMessage({ target: "offscreen", ...msg }); } catch {} }
@@ -2034,10 +2034,10 @@ function renderDenoise(m) {
 // ===================== De-reverb =====================
 const drvAnAid = {}; // module id -> last applied analysis id (apply each result once)
 function renderDereverb(m) {
-  m.amount = m.amount ?? 50; m.tail = m.tail ?? 300; m.residual = m.residual ?? 12; m.mix = m.mix ?? 100;
+  m.amount = m.amount ?? 50; m.tail = m.tail ?? 300; m.residual = m.residual ?? 12; m.mix = m.mix ?? 100; m.autoMakeup = m.autoMakeup ?? true;
   m.zoom = m.zoom ?? 2500;
   edEl.innerHTML = `
-    ${edHead(m.name, "De-reverb", `<button id="drvAnalyze" class="ed-toggle" title="Listen to a few seconds of the playing audio and auto-set Tail &amp; Amount from the room's reverb decay. Works best on speech or music with natural pauses.">✨ Analyze room</button>`)}
+    ${edHead(m.name, "De-reverb", `<button id="drvMakeup" class="ed-toggle ${m.autoMakeup ? "on" : ""}" title="Automatically restore the level the de-reverb removes, so toggling it isn't just 'quieter vs louder' (capped at +12 dB).">Auto makeup</button><button id="drvAnalyze" class="ed-toggle" title="Listen to a few seconds of the playing audio and auto-set Tail &amp; Amount from the room's reverb decay. Works best on speech or music with natural pauses.">✨ Analyze room</button>`)}
     <div class="dyn">
       <div class="lim-graph" style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
         <div class="graphwrap" title="Input level (blue) vs the de-reverbed output (green). The red is the reverb tail being removed — watch it shrink between words/notes as you raise Amount."><canvas id="drvCanvas"></canvas></div>
@@ -2061,6 +2061,8 @@ function renderDereverb(m) {
   const atkTip = document.getElementById("k_amount"); if (atkTip) atkTip.closest(".knob").title = "0% = bypass. Higher pulls reverb decays down harder.";
   const resTip = document.getElementById("k_residual"); if (resTip) resTip.closest(".knob").title = "How much reverb tail to leave behind. 0% = maximum removal (can sound gated/unnatural); raise it to keep some natural room ambience and avoid artefacts.";
   const tailTip = document.getElementById("k_tail"); if (tailTip) tailTip.closest(".knob").title = "Roughly the reverb decay time to chase — match it to the room. Longer removes longer tails (but can start thinning sustained notes).";
+  const mkBtn = document.getElementById("drvMakeup");
+  mkBtn.addEventListener("click", () => { m.autoMakeup = !m.autoMakeup; mkBtn.classList.toggle("on", m.autoMakeup); pushParam(m); save(); });
   const anBtn = document.getElementById("drvAnalyze");
   anBtn.addEventListener("click", () => {
     if (selectedTab == null) { toast("Capture a tab first"); return; }

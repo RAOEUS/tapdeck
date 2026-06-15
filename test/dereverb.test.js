@@ -26,6 +26,19 @@ test("de-reverb passes a steady (sustained) tone — doesn't kill direct sound",
   assert.ok(rms(blocks, 0, 150) > inRms * 0.7, "sustained tone should mostly survive");
 });
 
+test("auto-makeup raises the de-reverbed level back up", () => {
+  let s = 99;
+  const rnd = () => { s = (1103515245 * s + 12345) & 0x7fffffff; return s / 0x40000000 - 1; };
+  const run = (autoMakeup) => {
+    const { Processor } = loadWorklet("dereverb-processor.js");
+    const p = new Processor();
+    send(p, { amount: 90, tail: 400, residual: 0, mix: 100, autoMakeup });
+    let st = 99; const r = () => { st = (1103515245 * st + 12345) & 0x7fffffff; return st / 0x40000000 - 1; };
+    return rms(render(p, () => 0.25 * r(), { blocks: 250 }), 0, 120);
+  };
+  assert.ok(run(true) > run(false) * 1.15, "makeup should bring the level back up");
+});
+
 test("de-reverb attenuates a decaying tail", () => {
   const { Processor } = loadWorklet("dereverb-processor.js");
   const p = new Processor();

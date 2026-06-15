@@ -92,7 +92,8 @@ class Chan {
 class DereverbProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
-    this.amount = 50; this.tail = 300; this.residual = 12; this.mix = 100;
+    this.amount = 50; this.tail = 300; this.residual = 12; this.mix = 100; this.autoMakeup = true;
+    this.makeupG = 1; this.aMk = 1 - Math.exp(-128 / (0.3 * sampleRate)); // ~300 ms makeup smoothing
     const win = new Float32Array(N); let ss = 0;
     for (let i = 0; i < N; i++) { const w = 0.5 - 0.5 * Math.cos((2 * Math.PI * i) / N); win[i] = w; ss += w * w; }
     const winNorm = HOP / ss;
@@ -108,6 +109,7 @@ class DereverbProcessor extends AudioWorkletProcessor {
       if (typeof d.tail === "number") this.tail = d.tail;
       if (typeof d.residual === "number") this.residual = d.residual;
       if (typeof d.mix === "number") this.mix = d.mix;
+      if (typeof d.autoMakeup === "boolean") this.autoMakeup = d.autoMakeup;
       if (typeof d.analyze === "number") { this.anLeft = Math.round(d.analyze * sampleRate); this.slopes = []; this.peakHold = -120; this.prevDb = -120; }
     };
   }
@@ -162,9 +164,20 @@ class DereverbProcessor extends AudioWorkletProcessor {
       if (output.length > 1 && chans === 1) output[1].set(output[0].subarray(i, i + HOP), i);
     }
 
-    // input display envelope (smooth) + reduction -> scrolling trace for the GUI
-    let inPeak = 0;
-    for (let ch = 0; ch < chans; ch++) { const a = input[ch]; for (let i = 0; i < n; i++) { const v = Math.abs(a[i]); if (v > inPeak) inPeak = v; } }
+    // input peak (display) + in/out energy (auto-makeup), in one pass
+    let inPeak = 0, inSq = 0, outSq = 0;
+    for (let ch = 0; ch < chans; ch++) {
+      const a = input[ch], o = output[ch];
+      for (let i = 0; i < n; i++) { const x = a[i], v = x < 0 ? -x : x; if (v > inPeak) inPeak = v; inSq += x * x; outSq += o[i] * o[i]; }
+    }
+    // auto makeup: restore the level the de-reverb removed, smoothed, capped at +12 dB
+    if (this.autoMakeup) {
+      const target = Math.min(4, Math.max(1, Math.sqrt(inSq / (outSq + 1e-9))));
+      this.makeupG += (target - this.makeupG) * this.aMk;
+      const g = this.makeupG;
+      for (let ch = 0; ch < chans; ch++) { const o = output[ch]; for (let i = 0; i < n; i++) { let v = o[i] * g; if (v > 1) v = 1; else if (v < -1) v = -1; o[i] = v; } }
+    } else { this.makeupG = 1; }
+
     this.dispEnv = inPeak > this.dispEnv ? inPeak : inPeak + (this.dispEnv - inPeak) * this.dispRel;
     this.trace.push(20 * Math.log10(this.dispEnv + 1e-9), Math.max(0, redDb));
     if (this.trace.length >= 16) { this.port.postMessage({ type: "meter", s: this.trace }); this.trace = []; }
