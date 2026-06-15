@@ -247,15 +247,15 @@ table.bands tr { cursor: pointer; }
 
 /* compressor feed-forward / feed-back detector schematic */
 .det-flow { display: flex; gap: 16px; align-items: center; margin-top: 14px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 16px; box-shadow: var(--nm-out-sm); }
-.det-svg { width: 270px; height: 100px; flex: none; color: var(--accent2); }
+.det-svg { width: 280px; height: 106px; flex: none; }
 .det-svg text { fill: var(--muted); font-size: 10px; font-weight: 600; text-anchor: middle; }
 .det-svg .boxtxt { fill: var(--text); font-size: 9px; }
-.det-svg .sigwire { stroke: #3a4452; stroke-width: 2; }
-.det-svg .node { fill: #6b7280; }
+.det-svg .sigwire { stroke: #5b6470; stroke-width: 2; }
+.det-svg .node { fill: #8b929e; }
 .det-svg .box { fill: #11151b; stroke: #3a4452; stroke-width: 1.5; }
-.det-svg .ctrl { stroke: var(--accent2); stroke-width: 1.5; fill: none; }
-.det-svg .tap { stroke: #2a323d; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; transition: stroke .15s, opacity .15s; opacity: .5; }
-.det-svg .tap.active { stroke: var(--accent); stroke-width: 2; stroke-dasharray: none; opacity: 1; }
+.det-svg .ctrl { stroke: var(--accent2); stroke-width: 1.5; fill: none; } /* detector -> gain */
+.det-svg .sense { stroke: var(--accent); stroke-width: 2; fill: none; } /* where the detector listens */
+.det-svg .sense-dot { fill: var(--accent); }
 .det-text { font-size: 12px; color: var(--muted); line-height: 1.55; }
 .det-text b { color: var(--text); }
 .knob { background: linear-gradient(var(--panel), #13171e); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; }

@@ -1140,29 +1140,38 @@ function renderComp(m) {
       </div>
     </div>
     <div class="det-flow">
-      <svg viewBox="0 0 270 100" class="det-svg" aria-hidden="true">
-        <defs><marker id="dfArrow" markerWidth="7" markerHeight="7" refX="3.2" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="currentColor"/></marker></defs>
-        <line x1="20" y1="34" x2="250" y2="34" class="sigwire" />
+      <svg viewBox="0 0 280 106" class="det-svg" aria-hidden="true">
+        <defs>
+          <marker id="dfFlow" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#6b7280"/></marker>
+          <marker id="dfCtrl" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#ffb454"/></marker>
+          <marker id="dfSense" markerWidth="8" markerHeight="8" refX="5" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#36a3ff"/></marker>
+        </defs>
+        <!-- signal path, left to right -->
         <circle cx="20" cy="34" r="3" class="node" /><text x="20" y="19">in</text>
-        <rect x="112" y="22" width="46" height="24" rx="5" class="box" /><text x="135" y="38" class="boxtxt">GAIN</text>
-        <circle cx="250" cy="34" r="3" class="node" /><text x="250" y="19">out</text>
-        <rect x="96" y="74" width="78" height="20" rx="5" class="box" /><text x="135" y="88" class="boxtxt">DETECTOR</text>
-        <path d="M135,74 L135,48" class="ctrl" marker-end="url(#dfArrow)" />
-        <path id="ffTap" class="tap" d="M70,34 L70,84 L96,84" />
-        <path id="fbTap" class="tap" d="M205,34 L205,84 L174,84" />
+        <line x1="24" y1="34" x2="112" y2="34" class="sigwire" marker-end="url(#dfFlow)" />
+        <rect x="116" y="22" width="48" height="24" rx="5" class="box" /><text x="140" y="38" class="boxtxt">GAIN</text>
+        <line x1="164" y1="34" x2="258" y2="34" class="sigwire" marker-end="url(#dfFlow)" />
+        <circle cx="262" cy="34" r="3" class="node" /><text x="262" y="19">out</text>
+        <!-- detector controls the gain stage -->
+        <rect x="100" y="82" width="80" height="20" rx="5" class="box" /><text x="140" y="96" class="boxtxt">DETECTOR</text>
+        <path d="M140,82 L140,48" class="ctrl" marker-end="url(#dfCtrl)" />
+        <!-- single sense tap: moves to input (feed-forward) or output (feed-back) -->
+        <circle id="senseDot" cx="72" cy="34" r="2.8" class="sense-dot" />
+        <path id="senseTap" class="sense" marker-end="url(#dfSense)" d="M72,34 L72,92 L100,92" />
       </svg>
       <div class="det-text" id="detText"></div>
     </div>`;
   wireKnobs(m, cKnobs.map((k) => k[0]));
   function updateDetFlow() {
     const ff = m.detector !== "feedback";
-    const ffEl = document.getElementById("ffTap"), fbEl = document.getElementById("fbTap"), txt = document.getElementById("detText");
-    if (!ffEl) return;
-    ffEl.classList.toggle("active", ff);
-    fbEl.classList.toggle("active", !ff);
+    const tap = document.getElementById("senseTap"), dot = document.getElementById("senseDot"), txt = document.getElementById("detText");
+    if (!tap) return;
+    // the sense tap listens before the gain stage (feed-forward) or after it (feed-back)
+    if (ff) { tap.setAttribute("d", "M72,34 L72,92 L100,92"); dot.setAttribute("cx", "72"); }
+    else { tap.setAttribute("d", "M208,34 L208,92 L180,92"); dot.setAttribute("cx", "208"); }
     txt.innerHTML = ff
-      ? `<b>Feed-forward</b> — the detector measures the <b>input</b>, before the gain stage. Precise and predictable; the modern default.`
-      : `<b>Feed-back</b> — the detector measures the gain stage's <b>output</b> (the previous sample), so it self-regulates into a softer, rounder knee — the classic, vintage character.`;
+      ? `<b>Feed-forward</b> — the detector listens to the signal <b>before</b> the gain stage (the input), then sets the gain. Precise and predictable; the modern default.`
+      : `<b>Feed-back</b> — the detector listens <b>after</b> the gain stage (the output) and loops back to set the gain, so it self-regulates into a softer, rounder knee. The classic, vintage character.`;
   }
   updateDetFlow();
   document.getElementById("det").addEventListener("change", (e) => { m.detector = e.target.value; pushParam(m); save(); updateDetFlow(); });
