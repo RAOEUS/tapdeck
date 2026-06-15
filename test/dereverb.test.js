@@ -15,7 +15,7 @@ test("de-reverb at 0% Amount is transparent", () => {
   assert.ok(Math.abs(rms(blocks, 0, 90) - inRms) / inRms < 0.05, "0% should pass through");
 });
 
-test("de-reverb passes a steady (sustained) tone — doesn't kill direct sound", () => {
+test("de-reverb passes a steady (sustained) tone - doesn't kill direct sound", () => {
   const { Processor } = loadWorklet("dereverb-processor.js");
   const p = new Processor();
   send(p, { amount: 100, tail: 400, residual: 0, mix: 100 });

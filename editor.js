@@ -92,7 +92,7 @@ function openHpBrowser(m) {
       <div class="modal-head"><h2>Headphone EQ <span class="modal-hint" style="font-weight:400">AutoEq library</span></h2><button class="modal-x" title="Close">✕</button></div>
       <div style="padding:14px 20px 4px"><input id="hpSearch" type="search" placeholder="Search your headphones… (e.g. HD 650, Sundara, AirPods Pro)" autocomplete="off"></div>
       <div class="modal-body" id="hpBody"><p class="preset-none">Loading headphone list…</p></div>
-      <div class="modal-foot"><button id="hpRefresh">↻ Refresh list</button><span class="modal-hint">Applies the headphone's correction to this EQ. Fetched on demand from the AutoEq repo — nothing is stored on disk.</span></div>
+      <div class="modal-foot"><button id="hpRefresh">↻ Refresh list</button><span class="modal-hint">Applies the headphone's correction to this EQ. Fetched on demand from the AutoEq repo - nothing is stored on disk.</span></div>
     </div>`;
   document.body.appendChild(ov);
   hpModalEl = ov;
@@ -101,12 +101,12 @@ function openHpBrowser(m) {
   const body = ov.querySelector("#hpBody"), search = ov.querySelector("#hpSearch");
   let list = [];
   const draw = () => {
-    if (!list.length) { body.innerHTML = `<p class="preset-none">List unavailable — try ↻ Refresh.</p>`; return; }
+    if (!list.length) { body.innerHTML = `<p class="preset-none">List unavailable - try ↻ Refresh.</p>`; return; }
     const q = search.value.trim().toLowerCase();
     const all = q ? list.filter((h) => (h.n + " " + h.db).toLowerCase().includes(q)) : list;
     const shown = all.slice(0, 300);
     if (!shown.length) { body.innerHTML = `<p class="preset-none">No match for “${escapeHtml(search.value.trim())}”.</p>`; return; }
-    body.innerHTML = `<div class="hp-list">${shown.map((h, i) => `<button class="hp-item" data-i="${i}"><span class="hp-name">${escapeHtml(h.n)}</span><span class="hp-db">${escapeHtml(h.db)}</span></button>`).join("")}</div>${all.length > shown.length ? `<p class="preset-none">Showing ${shown.length} of ${all.length} — keep typing to narrow.</p>` : ""}`;
+    body.innerHTML = `<div class="hp-list">${shown.map((h, i) => `<button class="hp-item" data-i="${i}"><span class="hp-name">${escapeHtml(h.n)}</span><span class="hp-db">${escapeHtml(h.db)}</span></button>`).join("")}</div>${all.length > shown.length ? `<p class="preset-none">Showing ${shown.length} of ${all.length} - keep typing to narrow.</p>` : ""}`;
     body.querySelectorAll(".hp-item").forEach((el) => el.addEventListener("click", () => applyHp(m, shown[+el.dataset.i])));
   };
   search.addEventListener("input", draw);
@@ -280,9 +280,9 @@ const AGm = (o) => ({ type: "autogain", name: "Auto Gain", target: -16, speed: 5
 const PRESET_CATS = ["Listening", "Genre EQ", "Movies & Games", "Voice & Podcast", "Calls & Streaming", "Mastering", "Creative / FX"];
 const BUILTIN_PRESETS = {
   // ---- Listening ----
-  "Flat (reference)": { cat: "Listening", desc: "Unprocessed — a clean reference with the analyzer.", modules: [EQm([eb("peaking", 100, 0, 1), eb("peaking", 1000, 0, 1), eb("peaking", 8000, 0, 1)]), Am()] },
+  "Flat (reference)": { cat: "Listening", desc: "Unprocessed - a clean reference with the analyzer.", modules: [EQm([eb("peaking", 100, 0, 1), eb("peaking", 1000, 0, 1), eb("peaking", 8000, 0, 1)]), Am()] },
   "Bass Boost": { cat: "Listening", desc: "Deeper low end with a touch of air on top.", modules: [EQm([eb("lowshelf", 90, 6, 0.7), eb("peaking", 300, -1.5, 1), eb("highshelf", 10000, 2, 0.7)])] },
-  "Loudness Smile": { cat: "Listening", desc: "Smiley curve — fuller lows and brighter highs.", modules: [EQm([eb("lowshelf", 80, 5, 0.7), eb("peaking", 1000, -2, 0.8), eb("highshelf", 8000, 4, 0.7)])] },
+  "Loudness Smile": { cat: "Listening", desc: "Smiley curve - fuller lows and brighter highs.", modules: [EQm([eb("lowshelf", 80, 5, 0.7), eb("peaking", 1000, -2, 0.8), eb("highshelf", 8000, 4, 0.7)])] },
   "Vocal Clarity": { cat: "Listening", desc: "Lifts speech and vocals out of a busy mix.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 350, -3, 1.2), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -20, ratio: 3, attack: 8, makeup: 2 })] },
   "Warm & Smooth": { cat: "Listening", desc: "Tube warmth that softens digital harshness.", modules: [Sm({ drive: 5, mode: "tube", tone: -15, mix: 60 }), EQm([eb("lowshelf", 120, 1.5, 0.7), eb("highshelf", 9000, -2, 0.7)])] },
   "Air & Clarity": { cat: "Listening", desc: "Cuts mud, adds presence and high-end sparkle.", modules: [EQm([eb("peaking", 300, -2, 1), eb("peaking", 4000, 2, 1.2), eb("highshelf", 11000, 3, 0.7)])] },
@@ -302,12 +302,12 @@ const BUILTIN_PRESETS = {
   // ---- Mastering ----
   "Master Bus": { cat: "Mastering", desc: "Gentle glue compression into a clean limiter.", modules: [EQm([eb("highpass", 28, 0, 0.7), eb("peaking", 200, -1, 1), eb("highshelf", 12000, 1.5, 0.7)]), Cm({ name: "Glue Comp", threshold: -18, ratio: 2, attack: 30, release: 150, makeup: 2, detector: "feedback" }), Lm({ inputGain: 1, ceiling: -0.8, release: 80 }), Am()] },
   "Mastering (MB)": { cat: "Mastering", desc: "Multiband control into a true-peak limiter.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 12000, 1.5, 0.7)]), MBm("Multiband", [200, 3000], [mbBand(-22, 2, 30, 200, 2), mbBand(-22, 2, 20, 160, 1.5), mbBand(-22, 2, 12, 120, 1.5)]), Lm({ inputGain: 1, ceiling: -0.8, release: 80, os: 4 }), Am()] },
-  "Loud Master": { cat: "Mastering", desc: "Pushed loudness with punch — for energetic music.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("lowshelf", 90, 1.5, 0.7), eb("highshelf", 11000, 2, 0.7)]), MBm("Multiband", [150, 2500], [mbBand(-24, 3, 20, 150, 3), mbBand(-22, 3, 15, 120, 2), mbBand(-20, 3, 8, 90, 2)]), Lm({ inputGain: 3, ceiling: -0.8, style: "punchy", os: 4 })] },
-  "Transparent Master": { cat: "Mastering", desc: "Minimal — just a clean true-peak ceiling.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 13000, 1, 0.7)]), Lm({ inputGain: 1, ceiling: -1, style: "transparent", os: 4 })] },
+  "Loud Master": { cat: "Mastering", desc: "Pushed loudness with punch - for energetic music.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("lowshelf", 90, 1.5, 0.7), eb("highshelf", 11000, 2, 0.7)]), MBm("Multiband", [150, 2500], [mbBand(-24, 3, 20, 150, 3), mbBand(-22, 3, 15, 120, 2), mbBand(-20, 3, 8, 90, 2)]), Lm({ inputGain: 3, ceiling: -0.8, style: "punchy", os: 4 })] },
+  "Transparent Master": { cat: "Mastering", desc: "Minimal - just a clean true-peak ceiling.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 13000, 1, 0.7)]), Lm({ inputGain: 1, ceiling: -1, style: "transparent", os: 4 })] },
 
   // ---- Creative / FX ----
-  "OTT": { cat: "Creative / FX", desc: "Aggressive up+down multiband — that modern, in-your-face sound.", modules: [MBm("OTT", [120, 2000], [ottBand(-30, 3, 15, 120, 3), ottBand(-30, 3, 10, 100, 3), ottBand(-30, 3, 6, 80, 3)]), EQm([eb("lowshelf", 90, 1, 0.7), eb("highshelf", 10000, 2, 0.7)])] },
-  "Lo-Fi": { cat: "Creative / FX", desc: "Band-limited and gritty — vintage/lo-fi character.", modules: [EQm([eb("highpass", 200, 0, 0.7), eb("peaking", 1000, 2, 1), eb("lowpass", 6000, 0, 0.7)]), Sm({ drive: 10, mode: "crunch", tone: -20, mix: 80, os: 4 })] },
+  "OTT": { cat: "Creative / FX", desc: "Aggressive up+down multiband - that modern, in-your-face sound.", modules: [MBm("OTT", [120, 2000], [ottBand(-30, 3, 15, 120, 3), ottBand(-30, 3, 10, 100, 3), ottBand(-30, 3, 6, 80, 3)]), EQm([eb("lowshelf", 90, 1, 0.7), eb("highshelf", 10000, 2, 0.7)])] },
+  "Lo-Fi": { cat: "Creative / FX", desc: "Band-limited and gritty - vintage/lo-fi character.", modules: [EQm([eb("highpass", 200, 0, 0.7), eb("peaking", 1000, 2, 1), eb("lowpass", 6000, 0, 0.7)]), Sm({ drive: 10, mode: "crunch", tone: -20, mix: 80, os: 4 })] },
   "Telephone": { cat: "Creative / FX", desc: "Narrowband 'phone call' effect.", modules: [EQm([eb("highpass", 300, 0, 0.9), eb("peaking", 1500, 4, 1.5), eb("lowpass", 3400, 0, 0.9)])] },
   "Saturated Drive": { cat: "Creative / FX", desc: "Heavy harmonic drive with output trim.", modules: [Sm({ drive: 14, mode: "tape", output: -3, os: 4 }), EQm([eb("lowshelf", 100, 1, 0.7), eb("highshelf", 10000, -1, 0.7)])] },
   "Wide & Big": { cat: "Creative / FX", desc: "Wider stereo image with a fuller tone.", modules: [Um({ width: 1.4 }), EQm([eb("lowshelf", 100, 1.5, 0.7), eb("highshelf", 10000, 2, 0.7)]), Cm({ threshold: -20, ratio: 2, attack: 20, release: 150, makeup: 1 })] },
@@ -317,14 +317,14 @@ const BUILTIN_PRESETS = {
   "Rock": { cat: "Genre EQ", desc: "Punchy lows, present mids, crisp top.", modules: [EQm([eb("lowshelf", 90, 3, 0.7), eb("peaking", 500, -2, 1), eb("peaking", 3000, 2.5, 1.1), eb("highshelf", 9000, 2.5, 0.7)])] },
   "EDM / Bass": { cat: "Genre EQ", desc: "Big sub & lows with sparkly highs.", modules: [EQm([eb("lowshelf", 70, 6, 0.7), eb("peaking", 400, -2, 1), eb("highshelf", 10000, 4, 0.7)])] },
   "Hip-Hop": { cat: "Genre EQ", desc: "Deep bass, smooth mids, clear vocals.", modules: [EQm([eb("lowshelf", 80, 5, 0.7), eb("peaking", 300, -2, 1), eb("peaking", 2500, 2, 1.1), eb("highshelf", 11000, 2, 0.7)])] },
-  "Classical": { cat: "Genre EQ", desc: "Natural and open — gentle air, rumble cut.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("peaking", 250, -1, 0.8), eb("highshelf", 12000, 2, 0.7)])] },
+  "Classical": { cat: "Genre EQ", desc: "Natural and open - gentle air, rumble cut.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("peaking", 250, -1, 0.8), eb("highshelf", 12000, 2, 0.7)])] },
   "Jazz": { cat: "Genre EQ", desc: "Warm mids, smooth and relaxed.", modules: [EQm([eb("lowshelf", 120, 2, 0.7), eb("peaking", 800, 1, 1), eb("highshelf", 9000, 1.5, 0.7)])] },
   "Acoustic": { cat: "Genre EQ", desc: "Intimate body with clear, airy detail.", modules: [EQm([eb("highpass", 60, 0, 0.7), eb("peaking", 200, -1.5, 1), eb("peaking", 4000, 2, 1.1), eb("highshelf", 11000, 3, 0.7)])] },
   "Vocal Boost": { cat: "Genre EQ", desc: "Pushes voices forward in any mix.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 350, -2.5, 1.1), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)])] },
 
   // ---- Movies & Games ----
   "Movie / TV Night": { cat: "Movies & Games", desc: "Tames explosions, lifts dialogue, and evens the level for late-night viewing.", modules: [EQm([eb("highpass", 45, 0, 0.7), eb("peaking", 300, -2, 1), eb("peaking", 2500, 3, 1.1), eb("highshelf", 9000, 1.5, 0.7)]), Cm({ threshold: -28, ratio: 3, attack: 20, release: 200, knee: 8, makeup: 4, detector: "feedback", scHpf: 80 }), Lm({ ceiling: -1, os: 4 })] },
-  "Dialogue Clarity": { cat: "Movies & Games", desc: "Maximum speech intelligibility — presence boost + leveling.", modules: [EQm([eb("highpass", 100, 0, 0.7), eb("peaking", 400, -3, 1.2), eb("peaking", 3000, 5, 1.3), eb("highshelf", 8000, 2, 0.7)]), AGm({ target: -15, speed: 70, range: 15, gate: -42 }), Lm({ ceiling: -1 })] },
+  "Dialogue Clarity": { cat: "Movies & Games", desc: "Maximum speech intelligibility - presence boost + leveling.", modules: [EQm([eb("highpass", 100, 0, 0.7), eb("peaking", 400, -3, 1.2), eb("peaking", 3000, 5, 1.3), eb("highshelf", 8000, 2, 0.7)]), AGm({ target: -15, speed: 70, range: 15, gate: -42 }), Lm({ ceiling: -1 })] },
   "Gaming": { cat: "Movies & Games", desc: "Brings up footsteps, cues and dialogue; tightens the lows.", modules: [EQm([eb("highpass", 60, 0, 0.7), eb("peaking", 250, -2, 1), eb("peaking", 4500, 4, 1.2), eb("highshelf", 8000, 3, 0.7)]), Cm({ threshold: -24, ratio: 3, attack: 10, release: 120, makeup: 3 })] },
   "Laptop Speakers": { cat: "Movies & Games", desc: "Adds body and tames harshness on small built-in speakers.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 180, 3, 0.9), eb("peaking", 3000, -3, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -22, ratio: 3, attack: 12, release: 140, makeup: 2 })] },
 };
@@ -700,7 +700,7 @@ function renderRack() {
     li.innerHTML = `
       <span class="grip" title="Drag to reorder">⠿</span>
       ${canBypass ? `<button class="pwr ${m.bypass ? "" : "on"}" title="Bypass">${m.bypass ? "○" : "●"}</button>` : `<span class="pwr ghost">◍</span>`}
-      <span class="name" title="${escapeHtml(m.name)} — double-click to rename">${escapeHtml(m.name)}</span>
+      <span class="name" title="${escapeHtml(m.name)} - double-click to rename">${escapeHtml(m.name)}</span>
       <span class="tag">${TAGS[m.type] || m.type}</span>
       <button class="dup" title="Duplicate">⧉</button>
       <button class="del" title="Remove">✕</button>`;
@@ -881,7 +881,7 @@ function makeCanvas(canvas, aspect, onResize) {
 // group (module selects/toggles) always ending in Reset. `controls` is optional
 // HTML for the module's own selects/toggles.
 function edHead(title, tag, controls) {
-  return `<div class="ed-head"><h1 id="edTitle" title="${escapeHtml(title)} — double-click to rename">${escapeHtml(title)}</h1><span class="tag">${tag}</span>` +
+  return `<div class="ed-head"><h1 id="edTitle" title="${escapeHtml(title)} - double-click to rename">${escapeHtml(title)}</h1><span class="tag">${tag}</span>` +
     `<div class="ed-controls">${controls || ""}<button class="ed-reset" id="resetMod" title="Reset to defaults">Reset</button></div></div>`;
 }
 
@@ -892,7 +892,7 @@ function renderEQ(m) {
   m.chMode = m.chMode || "stereo";
   const chModeSel = `<label class="detsel" title="Apply the EQ to the whole stereo image, the Mid (centre / mono) only, or the Side (stereo difference) only.">Process <select id="eqChMode">${[["stereo", "Stereo"], ["mid", "Mid"], ["side", "Side"]].map(([v, l]) => `<option value="${v}" ${m.chMode === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>`;
   edEl.innerHTML = `
-    ${edHead(m.name, "Parametric EQ", `${chModeSel}<button id="eqSolo" class="ed-toggle" title="Solo the selected band — hear exactly the change it makes (the band, phase-cancelled against the dry signal)">Solo band</button>`)}
+    ${edHead(m.name, "Parametric EQ", `${chModeSel}<button id="eqSolo" class="ed-toggle" title="Solo the selected band - hear exactly the change it makes (the band, phase-cancelled against the dry signal)">Solo band</button>`)}
     <div class="graphwrap"><canvas id="eqCanvas"></canvas></div>
     <div class="toolbar">
       <label>Range <select id="eqRange"><option>12</option><option selected>24</option><option>36</option></select> dB</label>
@@ -1325,8 +1325,8 @@ function renderComp(m) {
     if (ff) { tap.setAttribute("d", "M72,34 L72,92 L100,92"); dot.setAttribute("cx", "72"); }
     else { tap.setAttribute("d", "M208,34 L208,92 L180,92"); dot.setAttribute("cx", "208"); }
     txt.innerHTML = ff
-      ? `<b>Feed-forward</b> — the detector listens to the signal <b>before</b> the gain stage (the input), then sets the gain. Precise and predictable; the modern default.`
-      : `<b>Feed-back</b> — the detector listens <b>after</b> the gain stage (the output) and loops back to set the gain, so it self-regulates into a softer, rounder knee. The classic, vintage character.`;
+      ? `<b>Feed-forward</b> - the detector listens to the signal <b>before</b> the gain stage (the input), then sets the gain. Precise and predictable; the modern default.`
+      : `<b>Feed-back</b> - the detector listens <b>after</b> the gain stage (the output) and loops back to set the gain, so it self-regulates into a softer, rounder knee. The classic, vintage character.`;
   }
   updateDetFlow();
   document.getElementById("det").addEventListener("change", (e) => { m.detector = e.target.value; pushParam(m); save(); updateDetFlow(); });
@@ -1628,7 +1628,7 @@ function renderLimiter(m) {
         let im = -200, gm = 0;
         for (let i = lo; i < hi && i < len; i++) { if (histIn[i] > im) im = histIn[i]; if (histGR[i] > gm) gm = histGR[i]; }
         inV[k] = im; grV[k] = gm;
-        trend[k] = histLoud[Math.min(hi - 1, len - 1)]; // pre-smoothed loudness — stable, no per-frame re-seed
+        trend[k] = histLoud[Math.min(hi - 1, len - 1)]; // pre-smoothed loudness - stable, no per-frame re-seed
       }
       const xAt = (k) => (drawN <= 1 ? W : (k / (drawN - 1)) * W);
 
@@ -1641,7 +1641,7 @@ function renderLimiter(m) {
       ctx.lineTo(xAt(drawN - 1), H); ctx.closePath();
       ctx.fillStyle = grad; ctx.fill();
 
-      // gain reduction: red hanging from the top (0 dB) — deeper = more reduction
+      // gain reduction: red hanging from the top (0 dB) - deeper = more reduction
       ctx.beginPath(); ctx.moveTo(xAt(0), 0);
       for (let k = 0; k < drawN; k++) ctx.lineTo(xAt(k), Y(-grV[k]));
       ctx.lineTo(xAt(drawN - 1), 0); ctx.closePath();
@@ -2186,7 +2186,7 @@ function renderDereverb(m) {
     ${edHead(m.name, "De-reverb", `<button id="drvMakeup" class="ed-toggle ${m.autoMakeup ? "on" : ""}" title="Automatically restore the level the de-reverb removes, so toggling it isn't just 'quieter vs louder' (capped at +12 dB).">Auto makeup</button><button id="drvAnalyze" class="ed-toggle" title="Listen to a few seconds of the playing audio and auto-set Tail &amp; Amount from the room's reverb decay. Works best on speech or music with natural pauses.">✨ Analyze room</button>`)}
     <div class="dyn">
       <div class="lim-graph" style="flex:1; min-width:0; display:flex; flex-direction:column; gap:8px">
-        <div class="graphwrap" title="Input level (blue) vs the de-reverbed output (green). The red is the reverb tail being removed — watch it shrink between words/notes as you raise Amount."><canvas id="drvCanvas"></canvas></div>
+        <div class="graphwrap" title="Input level (blue) vs the de-reverbed output (green). The red is the reverb tail being removed - watch it shrink between words/notes as you raise Amount."><canvas id="drvCanvas"></canvas></div>
         <label class="hint" style="display:flex; align-items:center; gap:8px" title="How much history is shown across the graph.">Zoom
           <input type="range" id="drvZoom" min="500" max="8000" step="100" value="${m.zoom}" style="flex:1">
           <span id="drvZoomV" style="min-width:48px; text-align:right">${(m.zoom / 1000).toFixed(1)} s</span>
@@ -2206,7 +2206,7 @@ function renderDereverb(m) {
   wireKnobs(m, ["amount", "tail", "residual", "mix"]);
   const atkTip = document.getElementById("k_amount"); if (atkTip) atkTip.closest(".knob").title = "0% = bypass. Higher pulls reverb decays down harder.";
   const resTip = document.getElementById("k_residual"); if (resTip) resTip.closest(".knob").title = "How much reverb tail to leave behind. 0% = maximum removal (can sound gated/unnatural); raise it to keep some natural room ambience and avoid artefacts.";
-  const tailTip = document.getElementById("k_tail"); if (tailTip) tailTip.closest(".knob").title = "Roughly the reverb decay time to chase — match it to the room. Longer removes longer tails (but can start thinning sustained notes).";
+  const tailTip = document.getElementById("k_tail"); if (tailTip) tailTip.closest(".knob").title = "Roughly the reverb decay time to chase - match it to the room. Longer removes longer tails (but can start thinning sustained notes).";
   const mkBtn = document.getElementById("drvMakeup");
   mkBtn.addEventListener("click", () => { m.autoMakeup = !m.autoMakeup; mkBtn.classList.toggle("on", m.autoMakeup); pushParam(m); save(); });
   const anBtn = document.getElementById("drvAnalyze");
@@ -2243,7 +2243,7 @@ function renderDereverb(m) {
         setK("tail", an.tail); setK("amount", an.amount); if (an.residual != null) setK("residual", an.residual);
         toast(`Analyzed room · Tail ${an.tail} ms · Amount ${an.amount}%`);
       } else {
-        toast("Couldn't read the reverb — play audio with pauses, then Analyze again");
+        toast("Couldn't read the reverb - play audio with pauses, then Analyze again");
       }
       anBtn.disabled = false; anBtn.textContent = "✨ Analyze room";
     }
@@ -2862,7 +2862,7 @@ document.addEventListener("keydown", (e) => {
   if (typing) return;
   const r = rack(), sel = r && r.modules.find((x) => x.id === r.selected);
   if (mod && k === "d") { if (sel) { e.preventDefault(); duplicateModule(sel.id); } return; }
-  // copy/paste a module across the rack/tabs — only when no text is selected, so it
+  // copy/paste a module across the rack/tabs - only when no text is selected, so it
   // doesn't steal a real text copy
   if (mod && k === "c" && !String(window.getSelection())) { if (sel) { e.preventDefault(); copyModule(sel.id); } return; }
   if (mod && k === "v" && !String(window.getSelection())) { if (r) { e.preventDefault(); pasteModule(); } return; }

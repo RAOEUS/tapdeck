@@ -1,5 +1,5 @@
 // Auto-gain / loudness leveler (AGC). Measures K-weighted (ITU-R BS.1770)
-// momentary loudness and slowly rides a broadband gain to hold a target LUFS —
+// momentary loudness and slowly rides a broadband gain to hold a target LUFS -
 // bringing quiet content up and loud content down. Boost is slow (no pumping
 // between words); cut is faster (tames loud bursts). A gate freezes the gain
 // when the signal drops below a floor so it never pumps up silence/noise, and a

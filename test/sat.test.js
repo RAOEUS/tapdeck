@@ -22,7 +22,7 @@ test("hard-clip saturator output is bounded", () => {
   let blocks = render(p, (t) => Math.sin((2 * Math.PI * 1000 * t) / SR), { blocks: 60 });
   assert.ok(peak(blocks, 0, 15) <= 1.001, "1x hard clip must stay at/under full scale");
   // 4x: band-limited reconstruction of the clipped (near-square) wave rings a little
-  // past full scale — that's expected, just stays finite and contained.
+  // past full scale - that's expected, just stays finite and contained.
   p = new (loadWorklet("sat-processor.js").Processor)();
   send(p, { drive: 24, mode: "hard", tone: 0, mix: 100, output: 0, os: 4 });
   blocks = render(p, (t) => Math.sin((2 * Math.PI * 1000 * t) / SR), { blocks: 60 });

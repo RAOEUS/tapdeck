@@ -2,7 +2,7 @@
 // Hann) with a per-bin "decay expander": each bin tracks a peak envelope whose
 // release time = the reverb tail you want to remove. When the live magnitude is
 // at/above that envelope (an onset or a sustained note) the bin passes; when it
-// sits BELOW a still-high envelope — i.e. it's a decaying tail — the bin is
+// sits BELOW a still-high envelope - i.e. it's a decaying tail - the bin is
 // attenuated. So it pulls down reverb decays between/after sounds while leaving
 // transients and steady direct sound intact. Each channel runs independently.
 // Params: { amount(0..100), tail(ms), residual(0..100), mix(0..100) }.
@@ -68,7 +68,7 @@ class Chan {
     // pass 2: magnitude-WEIGHTED smoothing of the gain across frequency + time, then
     // apply. Weighting by magnitude is what kills the "underwater"/musical-noise
     // artefact (isolated nulls in quiet bins are smeared out) WITHOUT letting those
-    // quiet bins drag down strong tonal peaks — the peak dominates its own smoothing.
+    // quiet bins drag down strong tonal peaks - the peak dominates its own smoothing.
     let gAccum = 0;
     for (let k = 0; k <= NH; k++) {
       const lo = k > 2 ? k - 2 : 0, hi = k < NH - 2 ? k + 2 : NH;
@@ -137,7 +137,7 @@ class DereverbProcessor extends AudioWorkletProcessor {
         const med = s[s.length >> 1];
         const rt60 = Math.min(2.5, Math.max(0.1, 60 / med)); // seconds
         tail = Math.round(Math.min(1200, Math.max(80, rt60 * 1000 * 0.45)));
-        // deliberately conservative — over-reduction is what causes the "underwater" sound
+        // deliberately conservative - over-reduction is what causes the "underwater" sound
         amount = Math.round(Math.min(60, Math.max(30, 28 + rt60 * 20)));
         residual = Math.round(Math.min(20, Math.max(10, 19 - rt60 * 3)));
       }

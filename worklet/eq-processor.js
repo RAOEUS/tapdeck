@@ -96,7 +96,7 @@ class EQProcessor extends AudioWorkletProcessor {
     this.detRel = Math.exp(-1 / (0.05 * sampleRate));  // 50 ms release
     this.frames = 0;
     this.soloId = null; // id of the band to solo (hear only its change); null = normal
-    this.chMode = "stereo"; // stereo | mid | side — which part of the stereo image to EQ
+    this.chMode = "stereo"; // stereo | mid | side - which part of the stereo image to EQ
     this.port.onmessage = (e) => {
       const d = e.data || {};
       let rebuild = false;
@@ -157,8 +157,8 @@ class EQProcessor extends AudioWorkletProcessor {
 
     // band solo: find the soloed band in the live cascade. We capture its exact
     // in/out difference during the cascade below (phase cancellation), so the solo
-    // reflects everything the band actually does — including dynamic-EQ movement
-    // and dry/wet scaling — not just a static filter.
+    // reflects everything the band actually does - including dynamic-EQ movement
+    // and dry/wet scaling - not just a static filter.
     let soloIdx = -1;
     if (this.soloId != null) {
       for (let bi = 0; bi < this.bands.length; bi++) if (this.bands[bi].id === this.soloId) { soloIdx = bi; break; }
@@ -199,7 +199,7 @@ class EQProcessor extends AudioWorkletProcessor {
     this.frames += n;
     if (this.frames >= 256) {
       this.frames = 0;
-      if (anyDyn) { // key by band id, not index — the UI band list includes disabled bands this filtered list drops
+      if (anyDyn) { // key by band id, not index - the UI band list includes disabled bands this filtered list drops
         const mb = {};
         for (const b of this.bands) if (b.dynMode !== "off") mb[b.id] = b.dynDb;
         this.port.postMessage({ type: "meter", mb });

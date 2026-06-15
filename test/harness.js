@@ -3,7 +3,7 @@
 // that reference the AudioWorklet globals (sampleRate, AudioWorkletProcessor,
 // registerProcessor) and call registerProcessor() at load. We run each file in a
 // vm context with those globals stubbed, capture the processor class, and drive
-// its process() directly — no browser, fully deterministic.
+// its process() directly - no browser, fully deterministic.
 const fs = require("node:fs");
 const path = require("node:path");
 const vm = require("node:vm");

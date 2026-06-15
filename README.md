@@ -1,8 +1,8 @@
 # Tapdeck
 
 A modular real-time audio processor for Chrome that captures a tab's audio and
-runs it through a rack you build — EQ, dynamics, saturation, stereo tools and a
-brick-wall limiter, in any order — all inside the extension via `AudioWorklet`.
+runs it through a rack you build - EQ, dynamics, saturation, stereo tools and a
+brick-wall limiter, in any order - all inside the extension via `AudioWorklet`.
 No native plugins, no system routing, no companion app.
 
 The UI is a full-page app (FabFilter-ish): draggable EQ curves over a live
@@ -22,7 +22,7 @@ service worker ──ensure──▶ offscreen document  (owns the AudioContext)
                    ◀── poll: spectrum + meters ─────────
 ```
 
-- **Engine** (`offscreen.js`): one independent session per captured tab — its own
+- **Engine** (`offscreen.js`): one independent session per captured tab - its own
   `AudioContext`, capture stream, ordered rack, and analyser. Rebuilds the node
   graph on any structural change; runs the spectrogram STFT on its own thread.
 - **Editor** (`editor.html` / `editor.js`): source of truth for all rack state.
@@ -43,7 +43,7 @@ needs a live user gesture that doesn't survive the hop to the worker.
 | **Compressor** | Down / Up / Expand / OTT modes, soft knee, **feed-forward / feed-back** detection, parallel mix, **sidechain HPF**. |
 | **Multiband** | Linkwitz-Riley split into N bands, a compressor per band, OTT-capable. |
 | **Gate / Expander** | Threshold/ratio/range/attack/release/hold with a live open/closed + level display. |
-| **Auto Gain** | Loudness leveler (AGC): rides a slow gain to hold a target LUFS — evens out quiet/loud content, with a gate and range limit, and a scrolling loudness display. |
+| **Auto Gain** | Loudness leveler (AGC): rides a slow gain to hold a target LUFS - evens out quiet/loud content, with a gate and range limit, and a scrolling loudness display. |
 | **Denoise** | Spectral noise suppressor (min-statistics + Wiener gate). 0% = transparent. |
 | **De-reverb** | STFT decay-expander: pulls down reverb tails while passing transients and sustained notes, with a scrolling input-vs-output display. |
 | **Transient** | Attack / sustain envelope shaping. |
@@ -62,12 +62,12 @@ needs a live user gesture that doesn't survive the hop to the worker.
 
 ## Development
 
-No build step — it's loaded as an unpacked extension. After editing source, reload the
+No build step - it's loaded as an unpacked extension. After editing source, reload the
 extension card in `chrome://extensions`; **worklet/offscreen** changes also need the tab
 re-captured (the `AudioContext` is built at capture time).
 
 ```
-npm test          # browser-free DSP tests (node --test) — runs the worklets in a vm shim
+npm test          # browser-free DSP tests (node --test) - runs the worklets in a vm shim
 npm run check     # syntax-check every shipped JS file
 ```
 
@@ -78,7 +78,7 @@ preserves the Mid, the drawn EQ curve matches the worklet's filter, …).
 
 ## Known limitations
 
-- **Chrome only** — Firefox has no `tabCapture`.
+- **Chrome only** - Firefox has no `tabCapture`.
 - Audio runs in an offscreen document because MV3 service workers can't host an `AudioContext`.
 - DRM/EME audio (some Netflix/Spotify) may not be capturable.
 - Browsers allow ~6 concurrent `AudioContext`s, so up to ~6 tabs can be processed at once.
