@@ -8,25 +8,12 @@
 // so they reach the right session. poll(tabId) returns that session's data plus
 // the list of all active sessions (for the tab switcher).
 
-const WORKLETS = {
-  eq: "worklet/eq-processor.js",
-  comp: "worklet/comp-processor.js",
-  limiter: "worklet/limiter-processor.js",
-  utility: "worklet/utility-processor.js",
-  mbcomp: "worklet/mbcomp-processor.js",
-  sat: "worklet/sat-processor.js",
-  trans: "worklet/trans-processor.js",
-  gate: "worklet/gate-processor.js",
-  denoise: "worklet/denoise-processor.js",
-  dereverb: "worklet/dereverb-processor.js",
-  autogain: "worklet/autogain-processor.js",
-  spectrum: "worklet/spectrum-processor.js",
-};
-const PROCESSOR = {
-  eq: "eq-processor", comp: "comp-processor", limiter: "limiter-processor",
-  utility: "utility-processor", mbcomp: "mbcomp-processor",
-  sat: "sat-processor", trans: "trans-processor", gate: "gate-processor", denoise: "denoise-processor", dereverb: "dereverb-processor", autogain: "autogain-processor",
-};
+// worklet path + processor-name tables, derived from the shared module registry
+// (module-registry.js, loaded first in offscreen.html). The spectrum tap is the
+// always-on analyzer front-end, not a rack module, so it's added explicitly.
+const WORKLETS = { spectrum: "worklet/spectrum-processor.js" };
+const PROCESSOR = {};
+for (const m of self.TAPDECK_MODULES) if (m.node) { WORKLETS[m.type] = m.worklet; PROCESSOR[m.type] = m.proc; }
 
 const FREQ_MIN = 20, FREQ_MAX = 20000, LOGN = 2048;
 const VALID_FFT = new Set([2048, 4096, 8192, 16384, 32768]);

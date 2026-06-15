@@ -13,24 +13,8 @@
           <h2>Rack</h2>
           <div id="addWrap">
             <button id="addBtn" aria-haspopup="true" aria-expanded="false">+ Add module</button>
-            <div id="addMenu" hidden>
-              <div class="addgroup">Tone</div>
-              <button data-add="eq"><b>EQ</b><span>shape the frequency balance</span></button>
-              <button data-add="sat"><b>Saturator</b><span>add harmonics &amp; warmth</span></button>
-              <button data-add="trans"><b>Transient</b><span>shape punch &amp; sustain</span></button>
-              <div class="addgroup">Dynamics</div>
-              <button data-add="comp"><b>Compressor</b><span>even out the level</span></button>
-              <button data-add="mbcomp"><b>Multiband</b><span>compress per frequency band</span></button>
-              <button data-add="gate"><b>Gate</b><span>cut noise &amp; bleed below a threshold</span></button>
-              <button data-add="autogain"><b>Auto Gain</b><span>even out loudness across content</span></button>
-              <button data-add="limiter"><b>Limiter</b><span>brick-wall the peaks / ceiling</span></button>
-              <div class="addgroup">Stereo &amp; cleanup</div>
-              <button data-add="utility"><b>Utility</b><span>gain, pan, width, mono, crossfeed</span></button>
-              <button data-add="denoise"><b>Denoise</b><span>reduce steady hiss &amp; hum</span></button>
-              <button data-add="dereverb"><b>De-reverb</b><span>tame room reverb &amp; tails</span></button>
-              <div class="addgroup">Analysis</div>
-              <button data-add="analyzer"><b>Scope</b><span>multi-resolution spectrogram</span></button>
-            </div>
+            <!-- populated from the module registry by editor.js (buildAddMenu) -->
+            <div id="addMenu" hidden></div>
           </div>
         </div>
         <div id="presetBar">
@@ -51,6 +35,7 @@
         <div id="moduleEditor"><p class="empty">Add or select a module.</p></div>
       </main>
     </div>
+    <script src="module-registry.js"></script>
     <script src="dsp-math.js"></script>
     <script src="editor.js"></script>
   </body>

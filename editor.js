@@ -684,7 +684,8 @@ function injectModulePresetBar(m, selectName) {
 
 // ---------- rack list (with drag-and-drop) ----------
 const listEl = document.getElementById("moduleList");
-const TAGS = { eq: "EQ", comp: "Comp", limiter: "Limiter", utility: "Util", mbcomp: "MBand", analyzer: "Scope", sat: "Sat", trans: "Trans", gate: "Gate", denoise: "Denoise", dereverb: "Dereverb", autogain: "AutoGain" };
+// rack chip labels, derived from the shared module registry (module-registry.js)
+const TAGS = Object.fromEntries(TAPDECK_MODULES.map((m) => [m.type, m.tag]));
 let dragId = null;
 
 function renderRack() {
@@ -782,13 +783,27 @@ function resetModule(m) {
   toast(`${m.name} reset to defaults`);
 }
 
-// add-module menu: one button opens a grouped picker with full names + descriptions
+// add-module menu: one button opens a grouped picker with full names + descriptions,
+// built from the shared module registry (groups in TAPDECK_MODULE_GROUPS order).
 const addBtnEl = document.getElementById("addBtn"), addMenuEl = document.getElementById("addMenu");
+function buildAddMenu() {
+  const esc = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const order = (g) => { const i = TAPDECK_MODULE_GROUPS.indexOf(g); return i < 0 ? TAPDECK_MODULE_GROUPS.length : i; };
+  const groups = [...new Set(TAPDECK_MODULES.map((m) => m.group))].sort((a, b) => order(a) - order(b));
+  let html = "";
+  for (const g of groups) {
+    html += `<div class="addgroup">${esc(g)}</div>`;
+    for (const m of TAPDECK_MODULES.filter((x) => x.group === g))
+      html += `<button data-add="${m.type}"><b>${esc(m.name)}</b><span>${esc(m.desc)}</span></button>`;
+  }
+  addMenuEl.innerHTML = html;
+  addMenuEl.querySelectorAll("button").forEach((b) =>
+    b.addEventListener("click", () => { setAddMenu(false); addModule(b.dataset.add); })
+  );
+}
 function setAddMenu(open) { addMenuEl.hidden = !open; addBtnEl.setAttribute("aria-expanded", open ? "true" : "false"); addBtnEl.classList.toggle("on", open); }
 addBtnEl.addEventListener("click", (e) => { e.stopPropagation(); setAddMenu(addMenuEl.hidden); });
-addMenuEl.querySelectorAll("button").forEach((b) =>
-  b.addEventListener("click", () => { setAddMenu(false); addModule(b.dataset.add); })
-);
+buildAddMenu();
 document.addEventListener("click", (e) => { if (!addMenuEl.hidden && !e.target.closest("#addWrap")) setAddMenu(false); });
 document.addEventListener("keydown", (e) => { if (e.key === "Escape") setAddMenu(false); });
 
@@ -798,6 +813,18 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") { closePre
 
 // ---------- editor panel ----------
 const edEl = document.getElementById("moduleEditor");
+// per-type editor renderers (function declarations below are hoisted). The
+// registry is the source of truth for which types exist; this maps each to its
+// render fn, and the guard below fails loudly if a registry entry has no UI.
+const RENDERERS = {
+  eq: renderEQ, comp: renderComp, limiter: renderLimiter, utility: renderUtility,
+  mbcomp: renderMBComp, sat: renderSat, trans: renderTrans, gate: renderGate,
+  denoise: renderDenoise, dereverb: renderDereverb, autogain: renderAutoGain,
+  analyzer: renderAnalyzer,
+};
+for (const mod of TAPDECK_MODULES) {
+  if (typeof RENDERERS[mod.type] !== "function") console.error(`Tapdeck: module "${mod.type}" has no renderer`);
+}
 function renderEditor() {
   if (viewCleanup) { viewCleanup(); viewCleanup = null; }
   currentDraw = null;
@@ -824,18 +851,7 @@ function renderEditor() {
       </div></div>`;
     return;
   }
-  if (m.type === "eq") renderEQ(m);
-  else if (m.type === "comp") renderComp(m);
-  else if (m.type === "limiter") renderLimiter(m);
-  else if (m.type === "utility") renderUtility(m);
-  else if (m.type === "mbcomp") renderMBComp(m);
-  else if (m.type === "sat") renderSat(m);
-  else if (m.type === "trans") renderTrans(m);
-  else if (m.type === "gate") renderGate(m);
-  else if (m.type === "denoise") renderDenoise(m);
-  else if (m.type === "dereverb") renderDereverb(m);
-  else if (m.type === "autogain") renderAutoGain(m);
-  else renderAnalyzer(m);
+  (RENDERERS[m.type] || renderAnalyzer)(m);
   const rb = document.getElementById("resetMod");
   if (rb) rb.onclick = () => resetModule(m);
   const tt = document.getElementById("edTitle");

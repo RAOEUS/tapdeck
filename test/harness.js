@@ -23,15 +23,21 @@ function loadDSP() {
   return runFile("dsp-math.js", { window: {} }).window.DSP;
 }
 
-// load a worklet processor; returns { Processor, ctx } (ctx exposes top-level fns too)
+// load a worklet processor; returns { Processor, ctx, name } (ctx exposes top-level fns too)
 function loadWorklet(file, sampleRate = 48000) {
-  let Processor = null;
+  let Processor = null, name = null;
   const ctx = runFile(path.join("worklet", file), {
     sampleRate,
     AudioWorkletProcessor: class { constructor() { this.port = { postMessage() {}, onmessage: null }; } },
-    registerProcessor: (_name, cls) => { Processor = cls; },
+    registerProcessor: (n, cls) => { Processor = cls; name = n; },
   });
-  return { Processor, ctx };
+  return { Processor, ctx, name };
+}
+
+// load the shared module registry (pure data); returns its globals
+function loadRegistry() {
+  const ctx = runFile("module-registry.js", {});
+  return { modules: ctx.TAPDECK_MODULES, groups: ctx.TAPDECK_MODULE_GROUPS, byType: ctx.TAPDECK_MODULE_BY_TYPE };
 }
 
 // push a params message into a processor (what the editor does over the port)
@@ -80,4 +86,4 @@ function toneMag(blocks, f, sr = 48000, ch = 0, fromBlock = 10) {
   return (2 * Math.sqrt(re * re + im * im)) / Math.max(1, count);
 }
 
-module.exports = { ROOT, loadDSP, loadWorklet, send, render, rms, peak, toneMag };
+module.exports = { ROOT, loadDSP, loadWorklet, loadRegistry, send, render, rms, peak, toneMag };
