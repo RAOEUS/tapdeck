@@ -1290,8 +1290,8 @@ function renderComp(m) {
       <div class="graphwrap" title="Transfer curve: input level (x) maps to output level (y). The dot rides the curve at the live level; hover anywhere for a readout. Top strip = gain change over time."><canvas id="compCanvas"></canvas></div>
       <div>
         <div class="meterbox" style="margin-bottom:16px">
-          <div><div class="meter" style="height:150px"><div class="fill" id="grFill"></div></div><div class="meter-label">GR <span id="grVal">0.0</span></div></div>
-          <div><div class="meter meter-up" style="height:150px"><div class="fill" id="upFill"></div></div><div class="meter-label">Boost <span id="upVal">0.0</span></div></div>
+          ${m.mode !== "up" ? `<div><div class="meter" style="height:150px"><div class="fill" id="grFill"></div></div><div class="meter-label">GR <span id="grVal">0.0</span></div></div>` : ""}
+          ${m.mode === "up" || m.mode === "ott" ? `<div><div class="meter meter-up" style="height:150px"><div class="fill" id="upFill"></div></div><div class="meter-label">Boost <span id="upVal">0.0</span></div></div>` : ""}
         </div>
         <div class="knobs">${cKnobs.map((k) => k[1]).join("")}</div>
       </div>
@@ -1345,6 +1345,7 @@ function renderComp(m) {
   const grVal = document.getElementById("grVal");
   const upFill = document.getElementById("upFill");
   const upVal = document.getElementById("upVal");
+  let grHold = 0, upHold = 0; // meter ballistics: instant rise, smooth fall (no jitter)
 
   let hover = null;
   const inHist = new Float32Array(120), outHist = new Float32Array(120), outGR = new Float32Array(120);
@@ -1496,11 +1497,11 @@ function renderComp(m) {
     ctx.fillStyle = "rgba(120,210,150,0.85)"; ctx.fillText("BOOST " + boost.toFixed(1), 6 * dpr, 3 * dpr);
     ctx.fillStyle = "rgba(255,140,130,0.9)"; ctx.fillText("GR " + red.toFixed(1), 6 * dpr, topH - 14 * dpr);
 
-    // sidebar meter + hover readout
-    grFill.style.height = clamp(red / 24, 0, 1) * 100 + "%";
-    grVal.textContent = red.toFixed(1);
-    upFill.style.height = clamp(boost / 24, 0, 1) * 100 + "%";
-    upVal.textContent = boost.toFixed(1);
+    // sidebar meters (ballistic: rise instantly, fall smoothly) + hover readout
+    grHold = red > grHold ? red : grHold * 0.86 + red * 0.14;
+    upHold = boost > upHold ? boost : upHold * 0.86 + boost * 0.14;
+    if (grFill) { grFill.style.height = clamp(grHold / 24, 0, 1) * 100 + "%"; grVal.textContent = grHold.toFixed(1); }
+    if (upFill) { upFill.style.height = clamp(upHold / 24, 0, 1) * 100 + "%"; upVal.textContent = upHold.toFixed(1); }
     if (hover) {
       const inDb = (hover[0] / W) * 60 - 60, outDb = (1 - (hover[1] - topH) / gh) * 60 - 60;
       drawCursor(ctx, W, H, dpr, hover[0], hover[1], ["in " + inDb.toFixed(1) + " dB", "out " + clamp(outDb, -60, 6).toFixed(1) + " dB"]);
