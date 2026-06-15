@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const ROOT = path.join(__dirname, "..");
-const files = ["editor.js", "dsp-math.js", "background.js", "popup.js", "offscreen.js", "module-registry.js"]
+const files = ["editor.js", "editor-helpers.js", "editor-renderers.js", "dsp-math.js", "background.js", "popup.js", "offscreen.js", "module-registry.js"]
   .concat(fs.readdirSync(path.join(ROOT, "worklet")).filter((f) => f.endsWith(".js")).map((f) => "worklet/" + f));
 
 let failed = 0;
