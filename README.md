@@ -114,15 +114,22 @@ Keyboard shortcuts in the editor: `Ctrl+Z` / `Ctrl+Y` undo and redo, `Ctrl+D` du
 
 ## Architecture
 
-```
-                 popup  ── Start (mints capture streamId, holds user gesture)
-                   │
-service worker ──ensure──▶ offscreen document  (owns the AudioContext)
-                                   │
-   tab audio ─tabCapture─▶ source ─▶ [ module, module, … ] ─▶ analyser ─▶ speakers
-                                   ▲                    │
-        editor tab ── sync structure/params ───────────┘
-                   ◀── poll: spectrum + meters ─────────
+```mermaid
+flowchart LR
+  popup["Popup<br/>holds the user gesture, mints the capture streamId"]
+  sw["Service worker<br/>creates the offscreen document"]
+  editor["Editor page<br/>source of truth for every rack"]
+
+  subgraph off["Offscreen document - one session per captured tab"]
+    direction LR
+    tab(["Tab audio"]) -- tabCapture --> src["Source"]
+    src --> rack["Module chain<br/>one AudioWorklet per module"]
+    rack --> spec["Spectrum tap"] --> out(["Speakers"])
+  end
+
+  popup -- start --> sw -- "ensure + hand off streamId" --> src
+  editor -- "structure + params" --> rack
+  spec -. "spectrum + meters (poll)" .-> editor
 ```
 
 - **Engine** (`offscreen.js`): one independent session per captured tab with its own `AudioContext`, capture stream, ordered rack and analyser. Rebuilds the node graph on any structural change; runs the spectrogram STFT on its own thread, off the audio thread.
