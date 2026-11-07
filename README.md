@@ -87,3 +87,5 @@ preserves the Mid, the drawn EQ curve matches the worklet's filter, …).
 ## License
 
 MIT - see [LICENSE](LICENSE).
+
+See [PRIVACY.md](PRIVACY.md) for the privacy policy (short version: nothing is collected).
