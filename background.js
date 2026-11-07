@@ -54,11 +54,12 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       try {
         await ensureOffscreen();
         // chrome.storage isn't available in offscreen docs, so read the saved rack
-        // here and hand it over to restore the chain on capture.
+        // here and hand it over to restore the chain on capture. A tab with no saved
+        // rack starts from the default template (the editor does the same when open).
         let rack = null;
         try {
-          const d = await chrome.storage.local.get("racks");
-          rack = d && d.racks && msg.tab ? d.racks[msg.tab.id] : null;
+          const d = await chrome.storage.local.get(["racks", "template"]);
+          rack = (d && d.racks && msg.tab && d.racks[msg.tab.id]) || (d && d.template) || null;
         } catch {}
         await sendToOffscreen({
           target: "offscreen",

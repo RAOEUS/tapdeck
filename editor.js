@@ -73,7 +73,12 @@ function pushParam(m) {
 }
 
 // ---------- persistence ----------
-function save() { chrome.storage.local.set({ racks, template }); }
+// Persist on a short trailing debounce (knob drags fire at mouse rate), and flush
+// immediately when the page hides/unloads so nothing is lost on close.
+let saveTimer = null;
+function save() { clearTimeout(saveTimer); saveTimer = setTimeout(flushSave, 150); }
+function flushSave() { if (saveTimer == null) return; clearTimeout(saveTimer); saveTimer = null; chrome.storage.local.set({ racks, template }); }
+window.addEventListener("pagehide", flushSave);
 function savePresets() { chrome.storage.local.set({ presets: userPresets }); }
 function load() {
   return new Promise((res) => {
@@ -91,6 +96,18 @@ function load() {
 function bumpUid(id) { const n = parseInt(String(id).replace(/\D/g, ""), 10); if (n >= uid) uid = n + 1; }
 function bumpRack(r) { if (!r) return; r.modules.forEach((m) => { bumpUid(m.id); (m.bands || []).forEach((b) => bumpUid(b.id)); }); }
 function defaultRack() { const m = defaultModule("eq"); return { modules: [m], selected: m.id }; }
+// Racks are keyed by tab id, and Chrome recycles tab ids across restarts - so a
+// rack saved for a long-closed tab would silently attach to an unrelated new one.
+// Drop racks whose tab no longer exists (at boot, and as tabs close).
+async function pruneRacks() {
+  try {
+    const open = new Set((await chrome.tabs.query({})).map((t) => t.id));
+    if (!open.size) return;
+    const stale = Object.keys(racks).filter((id) => !open.has(Number(id)));
+    if (stale.length) { stale.forEach((id) => delete racks[id]); save(); }
+  } catch {}
+}
+chrome.tabs.onRemoved.addListener((id) => { if (racks[id]) { delete racks[id]; save(); } });
 // deep-clone a rack with fresh ids (so a new tab starts from the template cleanly)
 function cloneRack(src) {
   const modules = (src ? src.modules : []).map((m) => {
@@ -129,19 +146,21 @@ const BUILTIN_PRESETS = {
   "Vocal Clarity": { cat: "Listening", desc: "Lifts speech and vocals out of a busy mix.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 350, -3, 1.2), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -20, ratio: 3, attack: 8, autoMakeup: true })] },
   "Warm & Smooth": { cat: "Listening", desc: "Tube warmth that softens digital harshness.", modules: [Sm({ drive: 5, mode: "tube", tone: -15, mix: 60 }), EQm([eb("lowshelf", 120, 1.5, 0.7), eb("highshelf", 9000, -2, 0.7)])] },
   "Air & Clarity": { cat: "Listening", desc: "Cuts mud, adds presence and high-end sparkle.", modules: [EQm([eb("peaking", 300, -2, 1), eb("peaking", 4000, 2, 1.2), eb("highshelf", 11000, 3, 0.7)])] },
-  "Night Mode": { cat: "Listening", desc: "Evens out loud and quiet so nothing startles late at night.", modules: [Cm({ threshold: -32, ratio: 4, attack: 15, release: 200, detector: "feedback", autoMakeup: true }), EQm([eb("lowshelf", 90, -2, 0.7), eb("highshelf", 9000, -1.5, 0.7)]), Lm({ ceiling: -1 })] },
-  "Auto Level": { cat: "Listening", desc: "Evens out loudness across videos, ads and songs - quiet stays audible, loud stays in check.", modules: [AGm({ target: -16, speed: 45, range: 14, gate: -45 }), Lm({ ceiling: -1, os: 4 })] },
+  // Leveling chains run the Auto Gain FIRST: it brings the programme to a known loudness, so the
+  // compressor/limiter after it work at fixed, predictable thresholds whatever the source level.
+  "Night Mode": { cat: "Listening", desc: "Late-night TV & films: dialogue stays clear, bass is eased (not removed) so thumps don't travel, and everything is held at a steady, quieter level.", modules: [EQm([eb("lowshelf", 100, -4, 0.7), eb("peaking", 250, -2, 1), eb("peaking", 3000, 2.5, 1.1), eb("highshelf", 9000, -2, 0.7)]), AGm({ target: -18, speed: 75, range: 24, gate: -50 }), Cm({ threshold: -18, ratio: 3, attack: 5, release: 150, knee: 8, scHpf: 100, autoMakeup: true }), Lm({ ceiling: -3, release: 100, os: 4 })] },
+  "Auto Level": { cat: "Listening", desc: "Evens out loudness across videos, ads and songs - quiet stays audible, loud stays in check.", modules: [AGm({ target: -16, speed: 65, range: 18, gate: -50 }), Lm({ ceiling: -1, os: 4 })] },
 
   // ---- Voice & Podcast ----
   "Podcast Voice": { cat: "Voice & Podcast", desc: "Full chain: denoise, gate, EQ, compression and a safety limiter.", modules: [Dm({ amount: 50, floor: 8 }), Gm({ threshold: -42, ratio: 6, range: 40, release: 150, hold: 20 }), EQm([eb("highpass", 80, 0, 0.7), eb("peaking", 250, -3, 1), eb("peaking", 3500, 3, 1.2), eb("highshelf", 10000, 2, 0.7)]), Cm({ threshold: -22, ratio: 3.5, attack: 6, makeup: 4 }), Lm({ ceiling: -1.5 })] },
   "Clean Voice": { cat: "Voice & Podcast", desc: "Denoise, shape and level for talking.", modules: [Dm({ amount: 45, floor: 8 }), EQm([eb("highpass", 85, 0, 0.7), eb("peaking", 300, -2.5, 1), eb("peaking", 3000, 3, 1.2)]), Cm({ threshold: -20, ratio: 3, attack: 8, makeup: 3 })] },
   "De-ess & Polish": { cat: "Voice & Podcast", desc: "A dynamic high band tames sibilance; gentle glue on top.", modules: [EQm([eb("highpass", 80, 0, 0.7), eqd("peaking", 7000, 3, 0, "down", -28, 8, 1, 80), eb("highshelf", 10000, 1.5, 0.7)]), Cm({ threshold: -20, ratio: 3, attack: 6, makeup: 2 })] },
-  "Broadcast": { cat: "Voice & Podcast", desc: "Loud, consistent, auto-leveled radio-style voice.", modules: [Dm({ amount: 35, floor: 10 }), EQm([eb("highpass", 75, 0, 0.7), eb("peaking", 2500, 2.5, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -24, ratio: 4, attack: 5, release: 100, makeup: 5 }), AGm({ target: -16, speed: 60, range: 12, gate: -42 }), Lm({ ceiling: -1, inputGain: 2, style: "punchy" })] },
+  "Broadcast": { cat: "Voice & Podcast", desc: "Loud, consistent, auto-leveled radio-style voice.", modules: [Dm({ amount: 35, floor: 10 }), EQm([eb("highpass", 75, 0, 0.7), eb("peaking", 2500, 2.5, 1.2), eb("highshelf", 9000, 2, 0.7)]), AGm({ target: -16, speed: 70, range: 18, gate: -48 }), Cm({ threshold: -18, ratio: 4, attack: 5, release: 100, knee: 6, autoMakeup: true }), Lm({ ceiling: -1, inputGain: 2, style: "punchy", os: 4 })] },
 
   // ---- Calls & Streaming ----
   "Noise Kill": { cat: "Calls & Streaming", desc: "Aggressive denoise + gate for fans, hum and room tone.", modules: [Dm({ amount: 80, floor: 4 }), Gm({ threshold: -38, ratio: 8, range: 50, release: 120, hold: 15 })] },
-  "Meeting Voice": { cat: "Calls & Streaming", desc: "Clear, consistently-leveled voice for calls.", modules: [Dm({ amount: 55, floor: 8 }), EQm([eb("highpass", 100, 0, 0.7), eb("peaking", 3000, 3, 1.2)]), Cm({ threshold: -22, ratio: 3, attack: 8, release: 110, makeup: 3 }), AGm({ target: -16, speed: 70, range: 15, gate: -42 }), Lm({ ceiling: -1 })] },
-  "Stream Master": { cat: "Calls & Streaming", desc: "Auto-levels to a streaming target with glue + true-peak limit.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 12000, 1.5, 0.7)]), Cm({ threshold: -18, ratio: 2, attack: 30, release: 150, makeup: 2, detector: "feedback" }), AGm({ target: -14, speed: 40, range: 12, gate: -45 }), Lm({ ceiling: -1.5, os: 4 })] },
+  "Meeting Voice": { cat: "Calls & Streaming", desc: "Clear, consistently-leveled voice for calls - quiet talkers come up, loud ones come down.", modules: [Dm({ amount: 55, floor: 8 }), EQm([eb("highpass", 100, 0, 0.7), eb("peaking", 3000, 3, 1.2)]), AGm({ target: -16, speed: 80, range: 18, gate: -50 }), Cm({ threshold: -18, ratio: 3, attack: 5, release: 110, knee: 6, autoMakeup: true }), Lm({ ceiling: -1 })] },
+  "Stream Master": { cat: "Calls & Streaming", desc: "Auto-levels to a streaming target with glue + true-peak limit.", modules: [EQm([eb("highpass", 30, 0, 0.7), eb("highshelf", 12000, 1.5, 0.7)]), AGm({ target: -14, speed: 45, range: 12, gate: -50 }), Cm({ threshold: -16, ratio: 2, attack: 30, release: 150, knee: 8, detector: "feedback", autoMakeup: true }), Lm({ ceiling: -1.5, os: 4 })] },
 
   // ---- Mastering ----
   "Master Bus": { cat: "Mastering", desc: "Gentle glue compression into a clean limiter.", modules: [EQm([eb("highpass", 28, 0, 0.7), eb("peaking", 200, -1, 1), eb("highshelf", 12000, 1.5, 0.7)]), Cm({ name: "Glue Comp", threshold: -18, ratio: 2, attack: 30, release: 150, detector: "feedback", autoMakeup: true }), Lm({ inputGain: 1, ceiling: -0.8, release: 80 }), Am()] },
@@ -167,10 +186,10 @@ const BUILTIN_PRESETS = {
   "Vocal Boost": { cat: "Genre EQ", desc: "Pushes voices forward in any mix.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 350, -2.5, 1.1), eb("peaking", 3000, 4, 1.2), eb("highshelf", 9000, 2, 0.7)])] },
 
   // ---- Movies & Games ----
-  "Movie / TV Night": { cat: "Movies & Games", desc: "Tames explosions, lifts dialogue, and auto-levels across scenes for late-night viewing.", modules: [EQm([eb("highpass", 45, 0, 0.7), eb("peaking", 300, -2, 1), eb("peaking", 2500, 3, 1.1), eb("highshelf", 9000, 1.5, 0.7)]), Cm({ threshold: -28, ratio: 3, attack: 20, release: 200, knee: 8, makeup: 4, detector: "feedback", scHpf: 80 }), AGm({ target: -17, speed: 50, range: 12, gate: -45 }), Lm({ ceiling: -1, os: 4 })] },
-  "Dialogue Clarity": { cat: "Movies & Games", desc: "Maximum speech intelligibility - presence boost + leveling.", modules: [EQm([eb("highpass", 100, 0, 0.7), eb("peaking", 400, -3, 1.2), eb("peaking", 3000, 5, 1.3), eb("highshelf", 8000, 2, 0.7)]), AGm({ target: -15, speed: 70, range: 15, gate: -42 }), Lm({ ceiling: -1 })] },
-  "Gaming": { cat: "Movies & Games", desc: "Brings up footsteps, cues and dialogue; tightens the lows.", modules: [EQm([eb("highpass", 60, 0, 0.7), eb("peaking", 250, -2, 1), eb("peaking", 4500, 4, 1.2), eb("highshelf", 8000, 3, 0.7)]), Cm({ threshold: -24, ratio: 3, attack: 10, release: 120, makeup: 3 })] },
-  "Laptop Speakers": { cat: "Movies & Games", desc: "Adds body and tames harshness on small built-in speakers.", modules: [EQm([eb("highpass", 90, 0, 0.7), eb("peaking", 180, 3, 0.9), eb("peaking", 3000, -3, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -22, ratio: 3, attack: 12, release: 140, makeup: 2 })] },
+  "Movie / TV": { cat: "Movies & Games", desc: "Instant leveling for films and shows: quiet dialogue comes up, loud scenes are reined in, the sub and the punch stay.", modules: [EQm([eb("peaking", 300, -1.5, 1), eb("peaking", 2800, 2.5, 1.1), eb("highshelf", 10000, 1.5, 0.7)]), AGm({ target: -16, speed: 75, range: 24, gate: -50 }), Cm({ threshold: -16, ratio: 2.5, attack: 8, release: 180, knee: 8, scHpf: 100, autoMakeup: true }), Lm({ ceiling: -1, release: 100, os: 4 })] },
+  "Dialogue Clarity": { cat: "Movies & Games", desc: "Maximum speech intelligibility - mud cut, presence lift, fast leveling, bass kept out of the way.", modules: [EQm([eb("highpass", 40, 0, 0.7), eb("peaking", 400, -3, 1.2), eb("peaking", 3000, 4, 1.2), eb("highshelf", 8000, 2, 0.7)]), AGm({ target: -16, speed: 85, range: 24, gate: -50 }), Cm({ threshold: -18, ratio: 3, attack: 5, release: 120, knee: 6, scHpf: 120, autoMakeup: true }), Lm({ ceiling: -1, os: 4 })] },
+  "Gaming": { cat: "Movies & Games", desc: "Brings up footsteps, cues and dialogue, clears the mud, and keeps the level steady without flattening the dynamics or the sub.", modules: [EQm([eb("peaking", 250, -2, 1), eb("peaking", 4500, 4, 1.2), eb("highshelf", 8000, 3, 0.7)]), AGm({ target: -16, speed: 60, range: 14, gate: -50 }), Cm({ threshold: -16, ratio: 3, attack: 3, release: 120, knee: 6, scHpf: 80, autoMakeup: true }), Lm({ ceiling: -1, os: 4 })] },
+  "Laptop Speakers": { cat: "Movies & Games", desc: "Bass the speakers can't play is removed (it only distorts), body is added where they can, harshness is tamed, peaks are kept safe.", modules: [EQm([eb("highpass", 120, 0, 0.7), eb("peaking", 250, 2.5, 1), eb("peaking", 3000, -2.5, 1.2), eb("highshelf", 9000, 2, 0.7)]), Cm({ threshold: -20, ratio: 3, attack: 10, release: 140, knee: 6, autoMakeup: true }), Lm({ ceiling: -1, os: 4 })] },
 };
 
 // transient non-blocking confirmation pill (bottom-center, fades after ~1.4s)
@@ -445,9 +464,10 @@ const BUILTIN_MODULE_PRESETS = {
   },
   autogain: {
     "General Listening": { target: -16, speed: 45, range: 12, gate: -45 },
-    "Dialog / Podcast": { target: -16, speed: 70, range: 15, gate: -42 },
+    "Dialog / Podcast": { target: -16, speed: 80, range: 18, gate: -50 },
+    "Movie / TV": { target: -16, speed: 75, range: 24, gate: -50 },
     "Gentle (album)": { target: -18, speed: 20, range: 9, gate: -48 },
-    "Aggressive Leveler": { target: -14, speed: 85, range: 18, gate: -40 },
+    "Aggressive Leveler": { target: -14, speed: 85, range: 24, gate: -45 },
     "Quiet Boost": { target: -14, speed: 50, range: 36, gate: -50 },
   },
   dereverb: {
@@ -465,7 +485,7 @@ const BUILTIN_MODULE_PRESETS = {
 function saveModulePresets() { chrome.storage.local.set({ modulePresets: userModulePresets }); }
 // the savable params for a module (analyzer's live-display fields aren't in paramsFor)
 function presetParamsFor(m) {
-  if (m.type === "analyzer") return { speed: m.speed, smooth: m.smooth, ceiling: m.ceiling, range: m.range, contrast: m.contrast, sharpen: m.sharpen, q: m.q, fft: m.fft, colormap: m.colormap, fMin: m.fMin, fMax: m.fMax, grid: m.grid };
+  if (m.type === "analyzer") return { speed: m.speed, smooth: m.smooth, ceiling: m.ceiling, range: m.range, contrast: m.contrast, sharpen: m.sharpen, q: m.q, fft: m.fft, colormap: m.colormap, fMin: m.fMin, fMax: m.fMax, grid: m.grid, view: m.view, wfSpeed: m.wfSpeed };
   return paramsFor(m);
 }
 function getModulePreset(type, name) {
@@ -474,7 +494,11 @@ function getModulePreset(type, name) {
 function applyModulePreset(m, name) {
   const raw = getModulePreset(m.type, name);
   if (!raw) return;
+  pushUndo();
   const spec = JSON.parse(JSON.stringify(raw)); // own copy (don't mutate built-ins)
+  // built-in presets only list the params they care about - start from the type's
+  // defaults so a previous preset's leftovers (mix, scHpf, range…) don't bleed through
+  Object.assign(m, presetParamsFor(defaultModule(m.type)));
   for (const k of Object.keys(spec)) {
     if (k === "bands" && m.type === "eq") m.bands = spec.bands.map((b) => ({ ...b, id: nid() }));
     else m[k] = spec[k];
@@ -532,6 +556,7 @@ const TAGS = Object.fromEntries(TAPDECK_MODULES.map((m) => [m.type, m.tag]));
 let dragId = null;
 
 function renderRack() {
+  const hadFocus = listEl.contains(document.activeElement); // keep keyboard focus in the list across re-renders
   listEl.innerHTML = "";
   const r = rack();
   if (!r) { listEl.innerHTML = `<li class="rack-empty">No tab selected.<br>Start one from the popup.</li>`; return; }
@@ -540,6 +565,7 @@ function renderRack() {
     const li = document.createElement("li");
     li.className = "module-item" + (m.id === r.selected ? " selected" : "") + (m.bypass ? " bypassed" : "");
     li.draggable = true;
+    li.tabIndex = 0; // focusable: Delete/Backspace only remove a module while the rack list has focus
     li.dataset.id = m.id;
     const canBypass = m.type !== "analyzer";
     li.innerHTML = `
@@ -554,7 +580,7 @@ function renderRack() {
       if (e.target.closest("button") || e.target.isContentEditable) return;
       r.selected = m.id; commit({ structure: false });
     });
-    if (canBypass) li.querySelector(".pwr").addEventListener("click", () => { m.bypass = !m.bypass; commit(); });
+    if (canBypass) li.querySelector(".pwr").addEventListener("click", () => { pushUndo(); m.bypass = !m.bypass; commit(); });
     li.querySelector(".dup").addEventListener("click", () => duplicateModule(m.id));
     li.querySelector(".del").addEventListener("click", () => removeModule(m.id));
     const nameEl = li.querySelector(".name");
@@ -578,12 +604,14 @@ function renderRack() {
 
     listEl.appendChild(li);
   });
+  if (hadFocus) { const sel = listEl.querySelector(".module-item.selected"); if (sel) sel.focus(); }
 }
 function reorder(srcId, targetId, after) {
   const r = rack();
   if (!r || !srcId || srcId === targetId) { renderRack(); return; }
   const src = r.modules.find((x) => x.id === srcId);
   if (!src) return;
+  pushUndo();
   r.modules = r.modules.filter((x) => x.id !== srcId);
   let ti = r.modules.findIndex((x) => x.id === targetId);
   if (ti < 0) ti = r.modules.length - 1;
@@ -602,6 +630,7 @@ function addModule(type) {
   const r = rack();
   if (!r) return;
   const m = defaultModule(type);
+  pushUndo();
   r.modules.push(m);
   r.selected = m.id;
   commit();
@@ -788,7 +817,8 @@ document.addEventListener("keydown", (e) => {
   // doesn't steal a real text copy
   if (mod && k === "c" && !String(window.getSelection())) { if (sel) { e.preventDefault(); copyModule(sel.id); } return; }
   if (mod && k === "v" && !String(window.getSelection())) { if (r) { e.preventDefault(); pasteModule(); } return; }
-  if (e.key === "Delete" || e.key === "Backspace") {
+  // only while the rack list has focus (click a module row) - not after clicking a graph
+  if ((e.key === "Delete" || e.key === "Backspace") && t && t.closest && t.closest("#moduleList")) {
     if (sel) { e.preventDefault(); removeModule(sel.id); toast(`Removed ${sel.name} - Ctrl+Z to undo`); }
   }
 });
@@ -848,8 +878,9 @@ function tick() {
   statusEl.classList.toggle("live", engine.running);
   if (engine.running) {
     const r = rack();
-    // look-ahead limiters are the only modules that add deliberate latency
-    const la = r ? r.modules.reduce((a, mm) => a + (mm.type === "limiter" && !mm.bypass ? (mm.lookahead || 0) : 0), 0) : 0;
+    // deliberate latency: limiter look-ahead + the STFT modules' frame delay (512-128 samples)
+    const stftMs = (384 / (engine.sampleRate || 48000)) * 1000;
+    const la = r ? r.modules.reduce((a, mm) => a + (mm.bypass ? 0 : mm.type === "limiter" ? (mm.lookahead || 0) : (mm.type === "denoise" || mm.type === "dereverb") ? stftMs : 0), 0) : 0;
     let silent = false; // when the analyzer tap is live we can tell if there's actually audio
     if (specOn && Array.isArray(engine.last)) { let mx = -200; for (const v of engine.last) if (v > mx) mx = v; silent = mx < -88; }
     statusEl.classList.toggle("nosignal", silent);
@@ -864,6 +895,7 @@ function tick() {
 function startLoop() { if (looping) return; looping = true; requestAnimationFrame(tick); }
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) {
+    flushSave();
     if (specTab != null) { send({ type: "spec-active", tabId: specTab, active: false }); specOn = false; }
   } else startLoop();
 });
@@ -871,6 +903,7 @@ document.addEventListener("visibilitychange", () => {
 // ---------- boot ----------
 (async function init() {
   await load();
+  await pruneRacks();
   renderPresets();
   renderSwitcher();
   renderRack();

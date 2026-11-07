@@ -112,7 +112,8 @@ class MBCompProcessor extends BaseProcessor {
     const peak = b.feedback ? b.fbLevel : (stereo ? Math.max(Math.abs(l), Math.abs(r)) : Math.abs(l));
     const levelDb = 20 * Math.log10(peak + 1e-9);
     const target = bandDyn(b, levelDb); // signed
-    const coeff = Math.abs(target) > Math.abs(b.envGain) ? b.atk : b.rel;
+    const more = Math.abs(target) > Math.abs(b.envGain); // expander: attack opens, release closes
+    const coeff = (more !== (b.mode === "expand")) ? b.atk : b.rel;
     b.envGain = target + (b.envGain - target) * coeff;
     // track cut and boost separately so the UI can show both directions at once (OTT)
     if (b.envGain < 0) { const d = -b.envGain; if (d > b.meterDown) b.meterDown = d; }

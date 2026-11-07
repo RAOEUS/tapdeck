@@ -87,7 +87,10 @@ class LimiterProcessor extends BaseProcessor {
     this.block = Math.round(0.1 * sampleRate); // 100 ms
     this.blkN = 0; this.blkL = 0; this.blkR = 0;
     this.ring = []; // recent blocks {eL,eR,ns}, up to 30 (3 s)
-    this.integEL = 0; this.integER = 0; this.integNS = 0;
+    // integrated: gated per BS.1770 (absolute -70 LUFS, then relative -10 LU under the
+    // absolute-gated mean). Momentary blocks are binned by 0.1 LU (count + summed
+    // power) so both gates cost O(bins) per block with bounded memory, any session length.
+    this.hN = new Float64Array(701); this.hP = new Float64Array(701); this.lufsI = -120;
 
     this.recalc();
   }
@@ -104,7 +107,7 @@ class LimiterProcessor extends BaseProcessor {
     if (typeof d.style === "string") this.style = d.style;
     if (typeof d.unity === "boolean") this.unity = d.unity;
     if (typeof d.dc === "boolean") this.dc = d.dc;
-    if (d.lufsReset) { this.integEL = this.integER = this.integNS = 0; }
+    if (d.lufsReset) { this.hN.fill(0); this.hP.fill(0); this.lufsI = -120; }
     this.recalc();
   }
 
@@ -199,6 +202,19 @@ class LimiterProcessor extends BaseProcessor {
     return -0.691 + 10 * Math.log10(eL / ns + eR / ns + 1e-12);
   }
 
+  // relative-gated integrated loudness from the block histogram
+  integrated() {
+    const hN = this.hN, hP = this.hP;
+    let n = 0, p = 0;
+    for (let b = 0; b <= 700; b++) { n += hN[b]; p += hP[b]; }
+    if (!n) return -120;
+    const rel = -0.691 + 10 * Math.log10(p / n) - 10;
+    const b0 = Math.max(0, Math.ceil((rel + 70) * 10));
+    n = 0; p = 0;
+    for (let b = b0; b <= 700; b++) { n += hN[b]; p += hP[b]; }
+    return n ? -0.691 + 10 * Math.log10(p / n) : -120;
+  }
+
   process(inputs, outputs) {
     const input = inputs[0], output = outputs[0];
     if (!input || input.length === 0) return true;
@@ -261,8 +277,12 @@ class LimiterProcessor extends BaseProcessor {
       if (this.blkN >= this.block) {
         this.ring.push({ eL: this.blkL, eR: this.blkR, ns: this.blkN });
         if (this.ring.length > 30) this.ring.shift();
-        // absolute-gated integrated: include the 400 ms momentary if above -70 LUFS
-        if (this.windowLufs(4) > -70) { this.integEL += this.blkL; this.integER += this.blkR; this.integNS += this.blkN; }
+        const lm = this.windowLufs(4); // one gating block = the 400 ms momentary window
+        if (lm > -70) { // absolute gate
+          const bin = Math.min(700, Math.round((lm + 70) * 10));
+          this.hN[bin]++; this.hP[bin] += Math.pow(10, (lm + 0.691) / 10);
+          this.lufsI = this.integrated();
+        }
         this.blkL = this.blkR = 0; this.blkN = 0;
       }
 
@@ -273,10 +293,9 @@ class LimiterProcessor extends BaseProcessor {
     this.frames += n;
     if (this.frames >= 512) {
       this.frames = 0;
-      const lufsI = this.integNS > 0 ? -0.691 + 10 * Math.log10(this.integEL / this.integNS + this.integER / this.integNS + 1e-12) : -120;
       this.meter({
         gr: this.meterGR, s: this.trace,
-        lufsM: this.windowLufs(4), lufsS: this.windowLufs(30), lufsI,
+        lufsM: this.windowLufs(4), lufsS: this.windowLufs(30), lufsI: this.lufsI,
         peak: 20 * Math.log10(this.peak + 1e-9),
         tp: 20 * Math.log10(this.meterTP + 1e-9),
       });

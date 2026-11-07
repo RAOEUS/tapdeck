@@ -14,7 +14,7 @@ function send(msg) { return chrome.runtime.sendMessage(msg); }
 async function refresh() {
   curTab = await activeTab();
   let res = null;
-  try { res = await send({ target: "offscreen", type: "poll", tabId: curTab.id }); } catch {}
+  try { res = await send({ target: "offscreen", type: "poll", tabId: curTab.id, light: true }); } catch {}
   running = !!(res && res.running);
   toggle.textContent = running ? "Stop this tab" : "Start on this tab";
   toggle.classList.toggle("danger", running);

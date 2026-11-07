@@ -8,12 +8,13 @@ function renderEQ(m) {
   m.sel = (m.sel != null && m.sel < m.bands.length) ? m.sel : 0;
   m.mix = m.mix ?? 100;
   m.chMode = m.chMode || "stereo";
+  m.eqRange = m.eqRange ?? 24; // graph ±dB range (display only; persisted with the module)
   const chModeSel = `<label class="detsel" title="Apply the EQ to the whole stereo image, the Mid (centre / mono) only, or the Side (stereo difference) only.">Process <select id="eqChMode">${[["stereo", "Stereo"], ["mid", "Mid"], ["side", "Side"]].map(([v, l]) => `<option value="${v}" ${m.chMode === v ? "selected" : ""}>${l}</option>`).join("")}</select></label>`;
   edEl.innerHTML = `
     ${edHead(m.name, "Parametric EQ", `${chModeSel}<button id="eqSolo" class="ed-toggle" title="Solo the selected band - hear exactly the change it makes (the band, phase-cancelled against the dry signal)">Solo band</button>`)}
     <div class="graphwrap"><canvas id="eqCanvas"></canvas></div>
     <div class="toolbar">
-      <label>Range <select id="eqRange"><option>12</option><option selected>24</option><option>36</option></select> dB</label>
+      <label>Range <select id="eqRange">${[12, 24, 36].map((v) => `<option ${m.eqRange === v ? "selected" : ""}>${v}</option>`).join("")}</select> dB</label>
       <label>Preamp <input type="number" id="eqPreamp" value="${(m.preamp || 0).toFixed(1)}" step="0.5" min="-24" max="24" style="width:62px"> dB</label>
       <label title="Dry/Wet: scales every bell/shelf band's gain toward flat - phase-coherent, no comb filtering">Dry/Wet <input type="number" id="eqMix" value="${m.mix ?? 100}" step="1" min="0" max="100" style="width:58px"> %</label>
       <button class="primary" id="addBand">+ Add band</button>
@@ -27,11 +28,11 @@ function renderEQ(m) {
     </tr></thead><tbody id="bandRows"></tbody></table>
     <div id="eqDyn" class="eq-dyn"></div>`;
 
-  let range = 24;
+  let range = m.eqRange;
   const canvas = document.getElementById("eqCanvas");
   const dims = makeCanvas(canvas, 0.42);
   const ctx = canvas.getContext("2d");
-  document.getElementById("eqRange").addEventListener("change", (e) => { range = Number(e.target.value); });
+  document.getElementById("eqRange").addEventListener("change", (e) => { range = m.eqRange = Number(e.target.value); save(); });
   document.getElementById("addBand").addEventListener("click", () => {
     m.bands.push({ id: nid(), type: "peaking", freq: 1000, gain: 0, q: 1, enabled: true }); commit();
   });

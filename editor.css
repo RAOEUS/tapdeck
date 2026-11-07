@@ -477,3 +477,7 @@ button.primary { background: var(--accent); color: #06121d; }
   .dyn .meter { height: 78px !important; }
   #compCanvas, #gateCanvas { max-height: 165px; }
 }
+
+/* module rows are focusable (Delete/Backspace act only while the list has focus) */
+.module-item:focus { outline: none; }
+.module-item:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }

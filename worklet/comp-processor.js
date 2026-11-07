@@ -113,7 +113,10 @@ class CompProcessor extends BaseProcessor {
       }
       const levelDb = 20 * Math.log10(detLevel + 1e-9);
       const targetGain = this.dyn(levelDb); // signed
-      const coeff = Math.abs(targetGain) > Math.abs(this.envGain) ? this.atkCoeff : this.relCoeff;
+      // attack = moving toward more gain change; except for an expander, where (gate
+      // convention) attack is how fast it OPENS and release how fast it closes.
+      const more = Math.abs(targetGain) > Math.abs(this.envGain);
+      const coeff = (more !== (this.mode === "expand")) ? this.atkCoeff : this.relCoeff;
       this.envGain = targetGain + (this.envGain - targetGain) * coeff;
 
       const g = Math.pow(10, this.envGain / 20); // gain-element gain (pre-makeup)

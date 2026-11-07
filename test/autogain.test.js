@@ -61,3 +61,12 @@ test("auto-gain holds (doesn't boost) below the gate", () => {
   const ratio = rms(blocks, 0, 500) / (noise / Math.SQRT2);
   assert.ok(ratio < 2, `below the gate the gain should stay put, not boost: ratio ${ratio.toFixed(2)}`);
 });
+
+test("auto-gain settles in fast after start (quiet film dialogue comes up within ~1 s)", () => {
+  const { Processor } = loadWorklet("autogain-processor.js");
+  const p = new Processor();
+  send(p, { target: -16, speed: 75, range: 24, gate: -50 });
+  let last = null; p.port.postMessage = (m) => { if (m.s) last = m.s[m.s.length - 1]; };
+  render(p, tone(0.02), { blocks: Math.round(SR / 128) }); // 1 s at ~ -34 dBFS (needs ~+15 dB)
+  assert.ok(last != null && last > 12, `gain should be most of the way there after 1 s, got ${last && last.toFixed(1)} dB`);
+});

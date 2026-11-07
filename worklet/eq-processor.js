@@ -114,7 +114,9 @@ class EQProcessor extends BaseProcessor {
     const old = this.bands;
     const filtered = specs.filter((b) => b.enabled !== false && TYPES.has(b.type));
     this.bands = filtered.map((b, i) => {
-      const prev = old[i]; // same index during a drag -> keep state + smooth from current
+      // keep state + smooth from current: match by band id (disabling a band shifts
+      // the enabled-list positions, so by-index handed state to the wrong neighbour)
+      const prev = b.id != null ? old.find((o) => o.id === b.id) : old[i];
       const specsForBand = sectionSpecs(b);
       // dynamic bands (compression per band): only on single-section bell/shelf filters
       const dyn = b.dynMode && b.dynMode !== "off" && specsForBand.length === 1 && b.type !== "lowpass" && b.type !== "highpass";

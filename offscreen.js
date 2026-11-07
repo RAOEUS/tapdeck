@@ -187,7 +187,7 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
       break;
     }
     case "poll":
-      sendResponse(poll(msg.tabId));
+      sendResponse(poll(msg.tabId, msg.light));
       return true;
   }
 });
@@ -346,10 +346,14 @@ function applyRack(s, rack) {
   for (const m of rack.modules) setParam(s, m.id, m);
 }
 
-function poll(tabId) {
+// light=true (popup) returns state only and leaves the spectrogram columns + meter
+// traces queued for the editor - draining them here made its displays drop frames.
+function poll(tabId, light) {
   const list = [...sessions.values()].map((s) => ({ tabId: s.tabId, title: (s.tab && s.tab.title) || ("Tab " + s.tabId) }));
   const s = sessions.get(tabId);
   if (!s || !s.spec) return { running: false, sessions: list };
+  const masterGain = s.master ? Math.round(20 * Math.log10(s.master.gain.value + 1e-9) * 10) / 10 : 0;
+  if (light) return { running: true, tabId: s.tabId, bypassed: !!s.masterBypass, masterGain, sessions: list };
   const cols = s.cols; s.cols = []; // hand over (and clear) the columns produced since last poll
   const meters = {};
   for (const [id, m] of s.modules) {
@@ -363,8 +367,7 @@ function poll(tabId) {
     if (m.scopeQ) m.scopeQ = [];
   }
   return {
-    running: true, tabId: s.tabId, tab: s.tab, fft: s.fft, q: s.mrQ, bypassed: !!s.masterBypass,
-    masterGain: s.master ? Math.round(20 * Math.log10(s.master.gain.value + 1e-9) * 10) / 10 : 0,
+    running: true, tabId: s.tabId, tab: s.tab, fft: s.fft, q: s.mrQ, bypassed: !!s.masterBypass, masterGain,
     sampleRate: s.ctx.sampleRate, logN: LOGN, cols, last: s.lastCol, meters, sessions: list,
     // round-trip audio I/O latency (buffering); module look-ahead is added in the UI
     latency: ((s.ctx.baseLatency || 0) + (s.ctx.outputLatency || 0)) * 1000,

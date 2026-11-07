@@ -101,7 +101,7 @@ function makeContext() {
           remove: (k, cb) => { if (typeof cb === "function") cb(); return Promise.resolve(); },
         },
       },
-      tabs: { query: (q, cb) => { if (typeof cb === "function") cb([]); return Promise.resolve([]); } },
+      tabs: { query: (q, cb) => { if (typeof cb === "function") cb([]); return Promise.resolve([]); }, onRemoved: { addListener() {} } },
     },
   };
   ctx.window = ctx; ctx.self = ctx; ctx.globalThis = ctx;

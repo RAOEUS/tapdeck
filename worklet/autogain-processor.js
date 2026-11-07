@@ -25,6 +25,10 @@ class AutoGainProcessor extends BaseProcessor {
     this.aRel = 1 - Math.exp(-1 / (0.4 * sampleRate));  // ~400 ms
     [this.kw1, this.kw2] = kWeightCoeffs(sampleRate);
     this.kSt = [[[0, 0, 0, 0], [0, 0, 0, 0]], [[0, 0, 0, 0], [0, 0, 0, 0]]];
+    // settle-in: for the first seconds after (re)start the boost side moves fast, so
+    // starting on a quiet film doesn't mean waiting several seconds for the dialogue
+    // to come up. Ends early once the gain is within 1 dB of where it wants to be.
+    this.lockLeft = Math.round(3 * sampleRate); this.lockCoeff = Math.exp(-1 / (0.15 * sampleRate));
     this.frames = 0; this.trace = [];
     this.anLeft = 0; this.aid = 0; this.anSum = 0; this.anCount = 0; // integrated-loudness measure
     this.recalc();
@@ -41,8 +45,10 @@ class AutoGainProcessor extends BaseProcessor {
 
   recalc() {
     const s = Math.min(1, Math.max(0, this.speed / 100));
-    const riseT = 4.0 * (1 - s) + 0.4 * s;   // boost (up) time constant: slow album -> fast dialog
-    const fallT = 0.25 * (1 - s) + 0.05 * s; // cut (down) is always fast so loud onsets are caught quickly
+    // log-spaced so the upper half of the knob is genuinely fast (dialog/film) while
+    // the lower half stays album-gentle: rise 4 s -> 1.3 s (50) -> 0.4 s; fall 0.25 -> 0.05 s
+    const riseT = 4.0 * Math.pow(0.1, s);   // boost (up) time constant
+    const fallT = 0.25 * Math.pow(0.2, s);  // cut (down) is always fast so loud onsets are caught quickly
     this.upCoeff = Math.exp(-1 / (riseT * sampleRate));
     this.downCoeff = Math.exp(-1 / (fallT * sampleRate));
   }
@@ -68,7 +74,10 @@ class AutoGainProcessor extends BaseProcessor {
       // desired gain toward the target, gated + range-limited; hold below the gate
       let desired = this.gainDb;
       if (lufs > gate) { desired = target - lufs; if (desired > range) desired = range; else if (desired < -range) desired = -range; }
-      const co = desired < this.gainDb ? this.downCoeff : this.upCoeff;
+      let co = desired < this.gainDb ? this.downCoeff : this.upCoeff;
+      if (this.lockLeft > 0 && lufs > gate) { // settle-in (only while there's signal to judge by)
+        if (Math.abs(desired - this.gainDb) < 1) this.lockLeft = 0; else { this.lockLeft--; if (co === this.upCoeff) co = this.lockCoeff; }
+      }
       this.gainDb = desired + (this.gainDb - desired) * co;
 
       const g = Math.pow(10, this.gainDb / 20);

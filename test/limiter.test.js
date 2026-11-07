@@ -39,3 +39,19 @@ test("limiter passes quiet signal through unchanged", () => {
   const blocks = render(p, (t) => amp * Math.sin((2 * Math.PI * 440 * t) / SR), { blocks: 200 });
   assert.ok(peak(blocks, 0, 60) <= amp + 1e-3 && peak(blocks, 0, 60) > amp - 0.02);
 });
+
+test("integrated LUFS applies the relative gate (quiet passages don't drag it down)", () => {
+  const lufsOf = (sig, blocks) => {
+    const { Processor } = loadWorklet("limiter-processor.js");
+    const p = new Processor();
+    let last = null; p.port.postMessage = (m) => { if (typeof m.lufsI === "number") last = m.lufsI; };
+    send(p, { ceiling: 0, lookahead: 1, inputGain: 0, os: 1 });
+    render(p, sig, { blocks });
+    return last;
+  };
+  const tone = (amp) => (t) => amp * Math.sin((2 * Math.PI * 1000 * t) / SR);
+  const loudOnly = lufsOf(tone(0.3), 1500);                                        // ~4 s of one level
+  const withQuiet = lufsOf((t) => (t < 1500 * 128 ? 0.3 : 0.003) * Math.sin((2 * Math.PI * 1000 * t) / SR), 3000); // then ~4 s at -40 dB
+  assert.ok(loudOnly > -40 && loudOnly < 0, `plausible integrated LUFS, got ${loudOnly}`);
+  assert.ok(Math.abs(withQuiet - loudOnly) < 1, `a -40 dB tail is below the relative gate and must not count: ${withQuiet.toFixed(1)} vs ${loudOnly.toFixed(1)}`);
+});
