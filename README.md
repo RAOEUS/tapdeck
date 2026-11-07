@@ -83,3 +83,7 @@ preserves the Mid, the drawn EQ curve matches the worklet's filter, …).
 - DRM/EME audio (some Netflix/Spotify) may not be capturable.
 - Browsers allow ~6 concurrent `AudioContext`s, so up to ~6 tabs can be processed at once.
 - Latency is fine for playback (a few ms + limiter look-ahead), not for live monitoring.
+
+## License
+
+MIT - see [LICENSE](LICENSE).

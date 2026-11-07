@@ -7,5 +7,6 @@
     "test": "node --test",
     "check": "node tools/check.js",
     "pack": "node tools/check.js && rm -f tapdeck-$npm_package_version.zip && zip -r -X tapdeck-$npm_package_version.zip manifest.json background.js offscreen.html offscreen.js popup.html popup.js editor.html editor.css editor.js editor-helpers.js editor-renderers.js module-registry.js dsp-math.js worklet icons fonts"
-  }
+  },
+  "license": "MIT"
 }
